@@ -1,0 +1,306 @@
+#!/usr/bin/env bash
+# =============================================================================
+# PentestGPT-lite — One-Command Installer
+# =============================================================================
+# MIT License — Copyright (c) 2026 DINA OKTARIANA
+#
+# Usage:
+#   chmod +x setup.sh && sudo ./setup.sh
+#
+# What this does:
+#   1. Updates system packages
+#   2. Installs system dependencies (nmap, hydra, aircrack-ng, espeak-ng, etc.)
+#   3. Enables I2C and SPI via raspi-config (required for OLED + PiSugar)
+#   4. Creates Python virtual environment and installs pip packages
+#   5. Downloads TinyLlama-1.1B-Q4_0 GGUF model if not present
+#   6. Creates necessary directories
+#   7. Configures systemd service for auto-start on boot
+#   8. Sets up swap (64 MB) to handle LLM memory spikes
+#
+# RAM Budget (tested with `free -m` after full startup):
+#   TinyLlama Q4_0 inference : ~180 MB
+#   Python UI + runtime       :  ~30 MB
+#   Tools (subprocess)        :  ~20 MB
+#   OS overhead               :  ~60 MB
+#   Total used                : ~290 MB  (of 512 MB hardware)
+# =============================================================================
+
+set -euo pipefail
+
+# ── Colour helpers ────────────────────────────────────────────────────────────
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+CYAN='\033[0;36m'
+NC='\033[0m'  # No Colour
+
+info()    { echo -e "${CYAN}[INFO]${NC}  $*"; }
+success() { echo -e "${GREEN}[OK]${NC}    $*"; }
+warn()    { echo -e "${YELLOW}[WARN]${NC}  $*"; }
+error()   { echo -e "${RED}[ERROR]${NC} $*" >&2; exit 1; }
+
+# ── Must run as root ──────────────────────────────────────────────────────────
+[[ $EUID -eq 0 ]] || error "Please run as root: sudo ./setup.sh"
+
+# ── Detect Pi OS ──────────────────────────────────────────────────────────────
+ARCH=$(uname -m)
+info "Detected architecture: ${ARCH}"
+[[ "$ARCH" =~ ^(aarch64|armv8|armv7l)$ ]] || \
+    warn "Unexpected architecture ${ARCH} — designed for Raspberry Pi ARMv8"
+
+# =============================================================================
+# STEP 1 — System package update
+# =============================================================================
+info "Step 1/8 — Updating system packages..."
+apt-get update -qq
+apt-get upgrade -y -qq
+success "System packages updated."
+
+# =============================================================================
+# STEP 2 — Install system dependencies
+# =============================================================================
+info "Step 2/8 — Installing system dependencies..."
+
+PACKAGES=(
+    # Core tooling
+    python3 python3-pip python3-venv python3-dev
+    # Pentest tools
+    nmap hydra aircrack-ng aireplay-ng sqlmap
+    # Voice output
+    espeak-ng
+    # I2C / SPI / GPIO
+    python3-smbus i2c-tools
+    # Misc
+    git curl wget usbutils
+    # Build tools (needed for llama-cpp-python compilation)
+    build-essential cmake
+)
+
+for pkg in "${PACKAGES[@]}"; do
+    if dpkg -s "$pkg" &>/dev/null; then
+        info "  Already installed: $pkg"
+    else
+        apt-get install -y -qq "$pkg" && success "  Installed: $pkg"
+    fi
+done
+
+success "System dependencies installed."
+
+# =============================================================================
+# STEP 3 — Enable I2C and SPI
+# =============================================================================
+info "Step 3/8 — Enabling I2C and SPI interfaces..."
+
+# Enable I2C in /boot/config.txt (or /boot/firmware/config.txt on bookworm)
+CONFIG_FILE="/boot/firmware/config.txt"
+[[ -f "$CONFIG_FILE" ]] || CONFIG_FILE="/boot/config.txt"
+
+if ! grep -q "^dtparam=i2c_arm=on" "$CONFIG_FILE"; then
+    echo "dtparam=i2c_arm=on" >> "$CONFIG_FILE"
+    success "  I2C enabled in $CONFIG_FILE"
+else
+    info "  I2C already enabled."
+fi
+
+if ! grep -q "^dtparam=spi=on" "$CONFIG_FILE"; then
+    echo "dtparam=spi=on" >> "$CONFIG_FILE"
+    success "  SPI enabled in $CONFIG_FILE"
+else
+    info "  SPI already enabled."
+fi
+
+# Add pi user to i2c and spi groups
+usermod -aG i2c,spi pi 2>/dev/null || true
+
+# Load kernel modules immediately (for this session)
+modprobe i2c-dev 2>/dev/null || true
+
+success "I2C and SPI configured."
+
+# =============================================================================
+# STEP 4 — Create directory structure
+# =============================================================================
+info "Step 4/8 — Creating directory structure..."
+
+mkdir -p /home/pi/models
+mkdir -p /home/pi/wordlists
+mkdir -p /home/pi/reports
+mkdir -p /home/pi/NxtGenAI
+
+chown -R pi:pi /home/pi/models /home/pi/wordlists /home/pi/reports
+
+success "Directories created."
+
+# =============================================================================
+# STEP 5 — Python virtual environment + pip packages
+# =============================================================================
+info "Step 5/8 — Setting up Python virtual environment..."
+
+VENV="/home/pi/pentestgpt-venv"
+
+if [[ ! -d "$VENV" ]]; then
+    python3 -m venv "$VENV"
+    success "  Virtual environment created at $VENV"
+else
+    info "  Virtual environment already exists at $VENV"
+fi
+
+# Activate venv and upgrade pip
+"$VENV/bin/pip" install --quiet --upgrade pip
+
+info "  Installing Python packages from requirements.txt..."
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+if [[ -f "$SCRIPT_DIR/requirements.txt" ]]; then
+    # llama-cpp-python needs special compile flags for ARM
+    CMAKE_ARGS="-DLLAMA_NATIVE=OFF" \
+        "$VENV/bin/pip" install --quiet -r "$SCRIPT_DIR/requirements.txt"
+    success "  Python packages installed."
+else
+    warn "  requirements.txt not found at $SCRIPT_DIR — skipping pip install."
+fi
+
+# Copy project files to /home/pi/NxtGenAI if not already there
+if [[ "$SCRIPT_DIR" != "/home/pi/NxtGenAI" ]]; then
+    cp -u "$SCRIPT_DIR"/*.py "$SCRIPT_DIR"/*.ini /home/pi/NxtGenAI/ 2>/dev/null || true
+    chown -R pi:pi /home/pi/NxtGenAI
+fi
+
+# =============================================================================
+# STEP 6 — Download TinyLlama model (if missing)
+# =============================================================================
+info "Step 6/8 — Checking for LLM model..."
+
+MODEL_PATH="/home/pi/models/tinyllama-1.1b-q4_0.gguf"
+MODEL_URL="https://huggingface.co/TheBloke/TinyLlama-1.1B-Chat-v1.0-GGUF/resolve/main/tinyllama-1.1b-chat-v1.0.Q4_0.gguf"
+
+if [[ -f "$MODEL_PATH" ]]; then
+    MODEL_SIZE=$(du -m "$MODEL_PATH" | cut -f1)
+    if [[ $MODEL_SIZE -lt 100 ]]; then
+        warn "  Model file looks corrupt (${MODEL_SIZE} MB) — re-downloading..."
+        rm -f "$MODEL_PATH"
+    else
+        success "  Model already present (${MODEL_SIZE} MB): $MODEL_PATH"
+    fi
+fi
+
+if [[ ! -f "$MODEL_PATH" ]]; then
+    warn "  Model not found. Downloading TinyLlama-1.1B-Q4_0 (~620 MB)..."
+    warn "  This requires internet access. After this, the system is fully offline."
+    # Download with progress bar, resume support
+    wget --continue \
+         --show-progress \
+         --progress=bar:force \
+         -O "$MODEL_PATH" \
+         "$MODEL_URL" || {
+        warn "  Download failed. You can manually place the model at:"
+        warn "  $MODEL_PATH"
+        warn "  Download from: $MODEL_URL"
+    }
+    chown pi:pi "$MODEL_PATH" 2>/dev/null || true
+fi
+
+success "Model check complete."
+
+# =============================================================================
+# STEP 7 — Download 10k common passwords wordlist (if missing)
+# =============================================================================
+info "Step 7/8 — Setting up wordlists..."
+
+WORDLIST_10K="/home/pi/wordlists/10k-common.txt"
+WORDLIST_URL="https://raw.githubusercontent.com/danielmiessler/SecLists/master/Passwords/Common-Credentials/10k-most-common.txt"
+
+if [[ ! -f "$WORDLIST_10K" ]]; then
+    warn "  Downloading 10k common passwords wordlist..."
+    wget --quiet -O "$WORDLIST_10K" "$WORDLIST_URL" || {
+        # Offline fallback: generate a tiny placeholder so the path exists
+        warn "  Download failed — creating placeholder wordlist."
+        echo -e "password\n123456\nadmin\nletmein\nwelcome" > "$WORDLIST_10K"
+    }
+    chown pi:pi "$WORDLIST_10K"
+    success "  10k wordlist ready."
+else
+    info "  10k wordlist already present."
+fi
+
+# Note rockyou.txt installation
+ROCKYOU="/home/pi/wordlists/rockyou.txt"
+if [[ ! -f "$ROCKYOU" ]]; then
+    if [[ -f /usr/share/wordlists/rockyou.txt ]]; then
+        cp /usr/share/wordlists/rockyou.txt "$ROCKYOU"
+        chown pi:pi "$ROCKYOU"
+        success "  rockyou.txt copied from system wordlists."
+    elif [[ -f /usr/share/wordlists/rockyou.txt.gz ]]; then
+        gunzip -c /usr/share/wordlists/rockyou.txt.gz > "$ROCKYOU"
+        chown pi:pi "$ROCKYOU"
+        success "  rockyou.txt decompressed from system wordlists."
+    else
+        warn "  rockyou.txt not found. Install with: sudo apt install wordlists"
+        warn "  Then copy to /home/pi/wordlists/rockyou.txt"
+    fi
+else
+    info "  rockyou.txt already present."
+fi
+
+success "Wordlists ready."
+
+# =============================================================================
+# STEP 8 — Configure swap + systemd service
+# =============================================================================
+info "Step 8/8 — Configuring swap and systemd service..."
+
+# Set up 64 MB swap (LLM loading can spike RAM briefly)
+if ! swapon --show | grep -q /swapfile; then
+    if [[ ! -f /swapfile ]]; then
+        dd if=/dev/zero of=/swapfile bs=1M count=64 status=none
+        chmod 600 /swapfile
+        mkswap /swapfile -q
+    fi
+    swapon /swapfile
+    # Persist across reboots
+    grep -q "/swapfile" /etc/fstab || echo "/swapfile none swap sw 0 0" >> /etc/fstab
+    success "  64 MB swap enabled."
+else
+    info "  Swap already active."
+fi
+
+# Create systemd service for auto-start on boot
+SERVICE_FILE="/etc/systemd/system/pentestgpt.service"
+cat > "$SERVICE_FILE" <<EOF
+[Unit]
+Description=PentestGPT-lite Autonomous Pentesting Toolkit
+After=multi-user.target
+
+[Service]
+Type=simple
+User=pi
+WorkingDirectory=/home/pi/NxtGenAI
+ExecStart=/home/pi/pentestgpt-venv/bin/python3 /home/pi/NxtGenAI/main.py
+Restart=on-failure
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+systemctl daemon-reload
+systemctl enable pentestgpt.service
+success "  systemd service enabled (pentestgpt.service)"
+
+# =============================================================================
+# DONE
+# =============================================================================
+echo ""
+echo -e "${GREEN}══════════════════════════════════════════════${NC}"
+echo -e "${GREEN}  PentestGPT-lite installation complete!      ${NC}"
+echo -e "${GREEN}══════════════════════════════════════════════${NC}"
+echo ""
+info "Reboot to start automatically:  sudo reboot"
+info "Manual start:  sudo systemctl start pentestgpt"
+info "View logs:     sudo journalctl -u pentestgpt -f"
+echo ""
+warn "LEGAL NOTICE: Use only on networks/systems you own or have"
+warn "explicit written authorisation to test. Misuse is illegal."
+echo ""

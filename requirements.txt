@@ -1,0 +1,33 @@
+# =============================================================================
+# PentestGPT-lite — Python Dependencies
+# =============================================================================
+# MIT License — Copyright (c) 2026 DINA OKTARIANA
+#
+# Install with:
+#   CMAKE_ARGS="-DLLAMA_NATIVE=OFF" pip install -r requirements.txt
+#
+# Notes:
+#   - llama-cpp-python: local LLM inference (TinyLlama GGUF). Must compile
+#     with CMAKE_ARGS="-DLLAMA_NATIVE=OFF" on ARM (Pi Zero 2 W ARMv8).
+#   - adafruit-circuitpython-ssd1306: SSD1306 OLED driver
+#   - pillow: PIL image library (used by SSD1306 driver for bitmap drawing)
+#   - smbus2: I2C access for PiSugar 3 battery monitor
+#   - requests: included as offline fallback (all API calls are commented out;
+#     kept for future extension without setup changes)
+# =============================================================================
+
+# Local LLM inference — CPU only, no GPU required
+# Version pinned for ABI compatibility with Pi OS Bookworm Python 3.11
+llama-cpp-python==0.2.90
+
+# OLED display driver (SSD1306 128×64 over I2C)
+adafruit-circuitpython-ssd1306==2.12.14
+
+# PIL — required by the SSD1306 Adafruit library for image operations
+Pillow==10.4.0
+
+# I2C access for PiSugar 3 (smbus2 preferred over older smbus)
+smbus2==0.4.3
+
+# HTTP client — offline fallback; no live API calls made in this codebase
+requests==2.32.3
