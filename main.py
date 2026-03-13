@@ -8,7 +8,7 @@
 #   1. Read config.ini
 #   2. Play boot splash on OLED + voice greeting
 #   3. Load LLM in background thread (non-blocking)
-#   4. Show menu; joystick/button events drive a state machine
+#   4. Voice-first UI: Button A=next, Button B=back, Button C=Push-to-Talk
 #   5. On mode selection: invoke ai_core.py ReAct loop or tool directly
 #   6. Power monitor (power.py) runs in daemon thread; shuts down on low battery
 #
@@ -20,11 +20,19 @@
 #   - llm_thread   : LLM initialisation (non-blocking startup)
 #   - power_thread : PiSugar polling (daemon)
 #   - tool_thread  : Pentest tool subprocess wrapper (daemon)
+#   - ptt_thread   : Push-to-talk audio capture (daemon, started per press)
+#
+# Button layout (Waveshare Play Hat — joystick removed):
+#   Button A (GPIO 21) — Next / cycle menu item + announces it aloud
+#   Button B (GPIO 20) — Back / previous menu item
+#   Button C (GPIO 16) — Push-to-Talk walkie-talkie (hold=record, release=act)
 # =============================================================================
 
 import configparser
 import logging
 import os
+import signal
+import subprocess
 import sys
 import threading
 import time
@@ -34,7 +42,8 @@ from enum import Enum, auto
 from ai_core import AICore          # ReAct loop + risk scoring
 from power import PowerMonitor      # PiSugar I2C battery management
 from tools import ToolRunner        # Pentest tool wrappers
-from ui import OLEDDisplay          # SSD1306 OLED + buttons + joystick
+from ui import OLEDDisplay          # SSD1306 OLED + buttons
+from voice_input import VoiceInput  # Push-to-talk offline STT
 
 # =============================================================================
 # Logging setup
@@ -63,7 +72,7 @@ import logging.handlers  # noqa: E402 — placed after basicConfig intentionally
 # =============================================================================
 class AppState(Enum):
     BOOT         = auto()   # Splash screen + LLM loading
-    MENU         = auto()   # Main menu; waiting for joystick selection
+    MENU         = auto()   # Main menu; waiting for button/voice input
     MODE_RUNNING = auto()   # Pentest mode executing
     RESULT       = auto()   # Displaying results / AI summary
     REPORT       = auto()   # Exporting report to USB
@@ -92,7 +101,7 @@ class PentestGPTApp:
     def __init__(self):
         self.cfg = self._load_config()
         self.state = AppState.BOOT
-        self.selected_mode_idx = 0    # Current joystick-highlighted menu item
+        self.selected_mode_idx = 0    # Currently highlighted menu item
         self.mode_key = None          # Active mode key (e.g. "wifi")
         self.llm_ready = threading.Event()   # Set when AI core finishes loading
         self.result_lines: list[str] = []    # Lines to scroll on OLED result view
@@ -103,6 +112,11 @@ class PentestGPTApp:
         self.ai: AICore | None = None
         self.power: PowerMonitor | None = None
         self.tools: ToolRunner | None = None
+        self.voice_input: VoiceInput | None = None
+
+        # Speech management — track PID for interruptible announcements
+        self._speak_pid: int | None = None
+        self._speak_lock = threading.Lock()
 
     # ── Configuration ─────────────────────────────────────────────────────────
     @staticmethod
@@ -123,19 +137,50 @@ class PentestGPTApp:
         return self.cfg.get(section, key, fallback=fallback)
 
     # ── Voice helper ──────────────────────────────────────────────────────────
-    def speak(self, text: str) -> None:
+    def speak(self, text: str, interrupt: bool = False) -> None:
         """
         Non-blocking espeak-ng call.
         Runs in a daemon thread so it never blocks the draw loop.
+
+        Args:
+            text      : Text to speak aloud.
+            interrupt : If True, stop any currently playing speech first.
+                        Use when announcing rapidly changing menu items.
         """
         voice = self._cfg("voice", "voice", "en-gb")
         speed = self._cfg("voice", "speed", "130")
         amp   = self._cfg("voice", "amplitude", "100")
 
         def _say() -> None:
-            # espeak-ng is a system binary — no internet, fully offline
-            cmd = f'espeak-ng -v {voice} -s {speed} -a {amp} "{text}" 2>/dev/null'
-            os.system(cmd)
+            with self._speak_lock:
+                if interrupt and self._speak_pid is not None:
+                    try:
+                        os.kill(self._speak_pid, signal.SIGTERM)
+                    except OSError:
+                        pass
+                    self._speak_pid = None
+
+            cmd = [
+                "espeak-ng",
+                "-v", voice,
+                "-s", speed,
+                "-a", amp,
+                text,
+            ]
+            try:
+                proc = subprocess.Popen(
+                    cmd,
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
+                )
+                with self._speak_lock:
+                    self._speak_pid = proc.pid
+                proc.wait()
+                with self._speak_lock:
+                    if self._speak_pid == proc.pid:
+                        self._speak_pid = None
+            except Exception as exc:
+                log.debug("speak() error: %s", exc)
 
         t = threading.Thread(target=_say, daemon=True)
         t.start()
@@ -189,6 +234,25 @@ class PentestGPTApp:
         t = threading.Thread(target=_load, daemon=True, name="llm_loader")
         t.start()
 
+    def _init_voice_input(self) -> None:
+        """Initialise the push-to-talk voice input (Vosk + PyAudio)."""
+        model_path = self._cfg(
+            "audio", "vosk_model",
+            "/home/pi/models/vosk-model-small-en-us",
+        )
+        try:
+            self.voice_input = VoiceInput(model_path=model_path)
+            if self.voice_input.available:
+                log.info("Voice input (PTT) ready with Vosk model at %s.", model_path)
+            else:
+                log.warning(
+                    "Voice input unavailable — Button C will act as SELECT. "
+                    "Install vosk + pyaudio and download the Vosk small-en-us model."
+                )
+        except Exception as exc:
+            log.warning("Voice input init failed (%s) — PTT disabled.", exc)
+            self.voice_input = None
+
     def _init_tools(self) -> None:
         """Initialise pentest tool runner."""
         self.tools = ToolRunner(self.cfg)
@@ -219,13 +283,18 @@ class PentestGPTApp:
         self._init_display()
         self._init_power()
         self._init_tools()
+        self._init_voice_input()
 
         # Show animated boot splash on OLED
         if self.display:
             self.display.show_splash()
 
-        # Voice greeting on first boot
-        self.speak("Welcome to PentestGPT-lite. Joystick to start.")
+        # Voice greeting — no joystick; walkie-talkie interface
+        self.speak(
+            "Welcome to PentestGPT-lite. "
+            "Press button A to cycle modes, button B to go back. "
+            "Hold button C to speak a voice command."
+        )
         log.info("Boot greeting spoken.")
 
         # Start LLM load (background thread)
@@ -249,8 +318,9 @@ class PentestGPTApp:
         else:
             log.warning("AI core unavailable — tool-only mode.")
 
-        # Transition to menu
+        # Transition to menu — announce first item
         self.state = AppState.MENU
+        self._announce_current_item()
 
     # ── Menu handling ─────────────────────────────────────────────────────────
     def _draw_menu(self) -> None:
@@ -263,23 +333,130 @@ class PentestGPTApp:
                 battery_pct=self.power.battery_pct if self.power else None,
             )
 
+    # ── Menu helpers ──────────────────────────────────────────────────────────
+    def _announce_current_item(self) -> None:
+        """Speak the name of the currently highlighted menu item (interruptible)."""
+        name = MODES[self.selected_mode_idx][0]
+        self.speak(name, interrupt=True)
+
     def _handle_menu_input(self) -> bool:
         """
-        Poll button/joystick events and update selection.
-        Returns True if a mode was selected (button A or joystick push).
+        Poll button events and update the menu selection.
+
+        Button layout:
+          A         — Next item (cycle forward) + announce it aloud
+          B         — Previous item (cycle backward) + announce it aloud
+          C_PRESS   — Start voice recording (show Listening… on OLED)
+          C_RELEASE — Stop recording; match voice command to action
+
+        Fallback when voice input unavailable:
+          C_PRESS / C_RELEASE — confirm current selection
+
+        Returns True when a mode has been confirmed and should start running.
         """
         if not self.display:
-            # Headless fallback: auto-select first mode after short delay
+            # Headless: auto-select first mode after short delay
             time.sleep(1)
             return True
 
         event = self.display.poll_event()
-        if event == "UP":
-            self.selected_mode_idx = (self.selected_mode_idx - 1) % len(MODES)
-        elif event == "DOWN":
+        if event is None:
+            return False
+
+        if event == "A":
+            # Next item + announce
             self.selected_mode_idx = (self.selected_mode_idx + 1) % len(MODES)
-        elif event in ("A", "SELECT"):
-            return True  # User confirmed selection
+            self._announce_current_item()
+
+        elif event == "B":
+            # Previous item + announce
+            self.selected_mode_idx = (self.selected_mode_idx - 1) % len(MODES)
+            self._announce_current_item()
+
+        elif event == "C_PRESS":
+            if self.voice_input and self.voice_input.available:
+                # Start PTT recording — show listening indicator
+                self.voice_input.start_recording()
+                if self.display:
+                    self.display.show_listening()
+                log.debug("PTT started in menu state.")
+            else:
+                # No voice input — C acts as SELECT
+                return True
+
+        elif event == "C_RELEASE":
+            if self.voice_input and self.voice_input.available:
+                # Stop recording and process command
+                text = self.voice_input.stop_and_recognise()
+                return self._handle_voice_command(text)
+
+        return False
+
+    def _handle_voice_command(self, text: str | None) -> bool:
+        """
+        Match recognised voice text to a menu action.
+        Returns True if a mode was selected and should start running.
+
+        Supported commands:
+          Mode names  : "wifi [crack]", "web [pentest]", "recon" / "network",
+                        "auto" / "ai" / "full auto"
+          Navigation  : "next", "back" / "previous"
+          Confirmation: "select" / "yes" / "ok" / "confirm" / "go" / "start"
+        """
+        if not text:
+            self.speak("I didn't catch that. Try again.")
+            return False
+
+        t = text.lower()
+        log.info("Voice command received: '%s'", t)
+
+        # ── Direct mode selection ──────────────────────────────────────────
+        if "wifi" in t:
+            idx = next((i for i, (_, k) in enumerate(MODES) if k == "wifi"), None)
+            if idx is not None:
+                self.selected_mode_idx = idx
+                self.speak(f"Selected {MODES[idx][0]}. Starting now.")
+                return True
+
+        if "web" in t:
+            idx = next((i for i, (_, k) in enumerate(MODES) if k == "web"), None)
+            if idx is not None:
+                self.selected_mode_idx = idx
+                self.speak(f"Selected {MODES[idx][0]}. Starting now.")
+                return True
+
+        if "recon" in t or "network" in t:
+            idx = next((i for i, (_, k) in enumerate(MODES) if k == "recon"), None)
+            if idx is not None:
+                self.selected_mode_idx = idx
+                self.speak(f"Selected {MODES[idx][0]}. Starting now.")
+                return True
+
+        if "auto" in t or " ai" in t or t == "ai":
+            idx = next((i for i, (_, k) in enumerate(MODES) if k == "auto"), None)
+            if idx is not None:
+                self.selected_mode_idx = idx
+                self.speak(f"Selected {MODES[idx][0]}. Starting now.")
+                return True
+
+        # ── Navigation ────────────────────────────────────────────────────
+        if "next" in t:
+            self.selected_mode_idx = (self.selected_mode_idx + 1) % len(MODES)
+            self._announce_current_item()
+            return False
+
+        if "back" in t or "previous" in t or "cancel" in t:
+            self._announce_current_item()
+            return False
+
+        # ── Confirm current item ───────────────────────────────────────────
+        if any(w in t for w in ("select", "yes", "ok", "confirm", "go", "start")):
+            name = MODES[self.selected_mode_idx][0]
+            self.speak(f"Starting {name}.")
+            return True
+
+        # ── Unknown command ────────────────────────────────────────────────
+        self.speak("Command not recognised. Say a mode name or next or select.")
         return False
 
     # ── Mode execution ────────────────────────────────────────────────────────
@@ -386,25 +563,51 @@ class PentestGPTApp:
     def _show_results(self) -> None:
         """
         Show scrollable result summary on OLED.
-        Button B → back to menu, Button C → export report.
+
+        Button layout:
+          A         — Scroll down one line
+          B         — Back to menu
+          C_PRESS   — Start voice recording (listening for command)
+          C_RELEASE — Stop recording; "export" / "usb" → export, "back" → menu
         """
         scroll_pos = 0
+        self.speak("Results ready. Press A to scroll, B to go back, "
+                   "or hold C to speak a command.")
         while self.state == AppState.RESULT:
             if self.display:
                 visible = self.result_lines[scroll_pos: scroll_pos + 4]
                 self.display.show_scroll(visible, scroll_pos,
                                          total=len(self.result_lines))
                 event = self.display.poll_event()
-                if event == "UP" and scroll_pos > 0:
-                    scroll_pos -= 1
-                elif event == "DOWN" and scroll_pos < len(self.result_lines) - 4:
-                    scroll_pos += 1
+                if event == "A":
+                    # Scroll down
+                    if scroll_pos < len(self.result_lines) - 4:
+                        scroll_pos += 1
                 elif event == "B":
                     self.state = AppState.MENU
                     break
-                elif event == "C":
-                    self._export_report()
-                    break
+                elif event == "C_PRESS":
+                    if self.voice_input and self.voice_input.available:
+                        self.voice_input.start_recording()
+                        self.display.show_listening()
+                    else:
+                        # No voice — C acts as export
+                        self._export_report()
+                        break
+                elif event == "C_RELEASE":
+                    if self.voice_input and self.voice_input.available:
+                        text = self.voice_input.stop_and_recognise() or ""
+                        t = text.lower()
+                        if any(w in t for w in ("export", "usb", "save")):
+                            self._export_report()
+                            break
+                        elif any(w in t for w in ("back", "menu", "cancel")):
+                            self.state = AppState.MENU
+                            break
+                        else:
+                            self.speak(
+                                "Say export to save to USB, or back to return."
+                            )
             else:
                 # Headless: print results and return to menu
                 for line in self.result_lines:
@@ -596,19 +799,26 @@ pre{background:#1e1e1e;padding:12px;border-radius:4px;overflow-x:auto;color:#a5d
 
             elif self.state == AppState.RESULT:
                 self._show_results()
+                # Announce menu on return
+                if self.state == AppState.MENU:
+                    self._announce_current_item()
 
             elif self.state == AppState.ERROR:
                 # Errors are shown for 3 s then return to menu
                 time.sleep(3)
                 self.state = AppState.MENU
+                self._announce_current_item()
 
             else:
                 time.sleep(0.05)
 
         # ── Graceful shutdown ─────────────────────────────────────────────────
         log.info("Shutdown requested.")
+        self.speak("Goodbye. Shutting down.")
         if self.display:
             self.display.show_message("Goodbye", "Shutting down...")
+        if self.voice_input:
+            self.voice_input.cleanup()
         time.sleep(2)
         os.system("sudo poweroff")
 
@@ -625,10 +835,14 @@ def main() -> None:
         log.info("Interrupted by user — exiting.")
         if app.display:
             app.display.clear()
+        if app.voice_input:
+            app.voice_input.cleanup()
     except Exception as exc:
         log.critical("Fatal error: %s", exc, exc_info=True)
         if app.display:
             app.display.show_message("FATAL ERROR", str(exc)[:20])
+        if app.voice_input:
+            app.voice_input.cleanup()
         time.sleep(5)
         raise
 

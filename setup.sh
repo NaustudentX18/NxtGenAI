@@ -68,6 +68,8 @@ PACKAGES=(
     nmap hydra aircrack-ng aireplay-ng sqlmap
     # Voice output
     espeak-ng
+    # Voice input — PyAudio requires PortAudio development headers
+    portaudio19-dev
     # I2C / SPI / GPIO
     python3-smbus i2c-tools
     # Misc
@@ -243,6 +245,43 @@ else
 fi
 
 success "Wordlists ready."
+
+# =============================================================================
+# STEP 7b — Download Vosk small English model (for Push-to-Talk voice input)
+# =============================================================================
+info "Step 7b/8 — Checking for Vosk offline speech recognition model..."
+
+VOSK_MODEL_DIR="/home/pi/models/vosk-model-small-en-us"
+VOSK_ZIP="/home/pi/models/vosk-model-small-en-us-0.15.zip"
+VOSK_URL="https://alphacephei.com/vosk/models/vosk-model-small-en-us-0.15.zip"
+
+if [[ -d "$VOSK_MODEL_DIR" ]]; then
+    success "  Vosk model already present: $VOSK_MODEL_DIR"
+else
+    warn "  Vosk model not found. Downloading (~40 MB)..."
+    warn "  This is used for offline push-to-talk voice recognition."
+    wget --continue \
+         --show-progress \
+         --progress=bar:force \
+         -O "$VOSK_ZIP" \
+         "$VOSK_URL" && {
+        unzip -q "$VOSK_ZIP" -d /home/pi/models/
+        # Rename extracted folder to canonical name if needed
+        extracted=$(find /home/pi/models -maxdepth 1 -type d -name "vosk-model-small-en-us*" | head -1)
+        if [[ "$extracted" != "$VOSK_MODEL_DIR" && -n "$extracted" ]]; then
+            mv "$extracted" "$VOSK_MODEL_DIR"
+        fi
+        rm -f "$VOSK_ZIP"
+        chown -R pi:pi "$VOSK_MODEL_DIR"
+        success "  Vosk model downloaded and extracted to $VOSK_MODEL_DIR"
+    } || {
+        warn "  Vosk download failed. Push-to-talk will be disabled until you"
+        warn "  manually download and extract the model to: $VOSK_MODEL_DIR"
+        warn "  URL: $VOSK_URL"
+    }
+fi
+
+success "Vosk model check complete."
 
 # =============================================================================
 # STEP 8 — Configure swap + systemd service
