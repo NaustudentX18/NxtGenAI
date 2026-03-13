@@ -64,6 +64,8 @@ info "Step 2/8 — Installing system dependencies..."
 PACKAGES=(
     # Core tooling
     python3 python3-pip python3-venv python3-dev
+    # Desktop GUI (Tkinter — required for python3 gui.py)
+    python3-tk
     # Pentest tools
     nmap hydra aircrack-ng aireplay-ng sqlmap
     # Voice output
@@ -303,7 +305,7 @@ else
     info "  Swap already active."
 fi
 
-# Create systemd service for auto-start on boot
+# Update systemd service for auto-start on boot (OLED headless mode)
 SERVICE_FILE="/etc/systemd/system/pentestgpt.service"
 cat > "$SERVICE_FILE" <<EOF
 [Unit]
@@ -336,9 +338,45 @@ echo -e "${GREEN}═════════════════════
 echo -e "${GREEN}  PentestGPT-lite installation complete!      ${NC}"
 echo -e "${GREEN}══════════════════════════════════════════════${NC}"
 echo ""
-info "Reboot to start automatically:  sudo reboot"
-info "Manual start:  sudo systemctl start pentestgpt"
-info "View logs:     sudo journalctl -u pentestgpt -f"
+echo -e "${CYAN}┌─────────────────────────────────────────────────────────────────┐${NC}"
+echo -e "${CYAN}│  🚀  HOW TO LAUNCH                                              │${NC}"
+echo -e "${CYAN}├─────────────────────────────────────────────────────────────────┤${NC}"
+echo -e "${CYAN}│  🖥️   Desktop GUI (recommended for beginners):                  │${NC}"
+echo -e "${CYAN}│       python3 /home/pi/NxtGenAI/gui.py                          │${NC}"
+echo -e "${CYAN}│                                                                  │${NC}"
+echo -e "${CYAN}│  📺  OLED headless (Raspberry Pi hardware):                     │${NC}"
+echo -e "${CYAN}│       sudo systemctl start pentestgpt                           │${NC}"
+echo -e "${CYAN}│       sudo python3 /home/pi/NxtGenAI/main.py                   │${NC}"
+echo -e "${CYAN}│                                                                  │${NC}"
+echo -e "${CYAN}│  🔄  Auto-start on boot (OLED mode):                            │${NC}"
+echo -e "${CYAN}│       sudo systemctl enable pentestgpt                          │${NC}"
+echo -e "${CYAN}│       sudo reboot                                                │${NC}"
+echo -e "${CYAN}├─────────────────────────────────────────────────────────────────┤${NC}"
+echo -e "${CYAN}│  🎙️   VOICE COMMANDS (say these into the microphone):           │${NC}"
+echo -e "${CYAN}│       'network scan'  — discover hosts on the network           │${NC}"
+echo -e "${CYAN}│       'wifi crack'    — capture & crack WPA2 handshake          │${NC}"
+echo -e "${CYAN}│       'web pentest'   — scan a web application                  │${NC}"
+echo -e "${CYAN}│       'brute force'   — run dictionary attack                   │${NC}"
+echo -e "${CYAN}│       'full auto'     — let AI chain all steps automatically    │${NC}"
+echo -e "${CYAN}│       'report'        — generate and export findings            │${NC}"
+echo -e "${CYAN}│       'stop'          — abort current operation                 │${NC}"
+echo -e "${CYAN}├─────────────────────────────────────────────────────────────────┤${NC}"
+echo -e "${CYAN}│  ⌨️   GUI KEYBOARD SHORTCUTS:                                   │${NC}"
+echo -e "${CYAN}│       SPACE    — Push-to-Talk (hold while speaking)             │${NC}"
+echo -e "${CYAN}│       F1       — Toggle command & voice guide panel             │${NC}"
+echo -e "${CYAN}│       F5       — Reset / restart buddy session                  │${NC}"
+echo -e "${CYAN}│       Ctrl+Q   — Quit safely                                    │${NC}"
+echo -e "${CYAN}├─────────────────────────────────────────────────────────────────┤${NC}"
+echo -e "${CYAN}│  🔧  HARDWARE BUTTONS (OLED mode):                              │${NC}"
+echo -e "${CYAN}│       Button A — Next menu item                                 │${NC}"
+echo -e "${CYAN}│       Button B — Previous item / back                           │${NC}"
+echo -e "${CYAN}│       Button C — Push-to-Talk voice input                       │${NC}"
+echo -e "${CYAN}├─────────────────────────────────────────────────────────────────┤${NC}"
+echo -e "${CYAN}│  📋  USEFUL COMMANDS:                                           │${NC}"
+echo -e "${CYAN}│       View logs:   sudo journalctl -u pentestgpt -f             │${NC}"
+echo -e "${CYAN}│       Edit config: nano /home/pi/NxtGenAI/config.ini            │${NC}"
+echo -e "${CYAN}│       Reports:     ls /home/pi/reports/                         │${NC}"
+echo -e "${CYAN}└─────────────────────────────────────────────────────────────────┘${NC}"
 echo ""
 warn "LEGAL NOTICE: Use only on networks/systems you own or have"
 warn "explicit written authorisation to test. Misuse is illegal."

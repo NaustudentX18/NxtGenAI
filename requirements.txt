@@ -12,6 +12,9 @@
 #   - adafruit-circuitpython-ssd1306: SSD1306 OLED driver
 #   - pillow: PIL image library (used by SSD1306 driver for bitmap drawing)
 #   - smbus2: I2C access for PiSugar 3 battery monitor
+#   - tkinter: built into the Python standard library but requires the system
+#     package python3-tk — installed automatically by setup.sh.
+#     Used by the desktop GUI (gui.py).
 #   - requests: included as offline fallback (all API calls are commented out;
 #     kept for future extension without setup changes)
 # =============================================================================
