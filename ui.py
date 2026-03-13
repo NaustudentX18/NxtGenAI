@@ -7,15 +7,15 @@
 # Manages:
 #   - SSD1306 128×64 OLED via I2C (adafruit-circuitpython-ssd1306)
 #   - Button inputs: A (GPIO 21), B (GPIO 20), C (GPIO 16) — Waveshare Play Hat
-#   - Joystick: UP (GPIO 6), DOWN (GPIO 19), LEFT (GPIO 5), RIGHT (GPIO 26),
-#               SELECT/push (GPIO 13) — Waveshare Play Hat pinout
 #   - All draw calls are double-buffered (<1 s refresh, non-blocking)
 #   - Animations: frame-by-frame splash, progress bar, scrolling text
 #
 # GPIO assignments (Waveshare Play Hat, BCM numbering):
-#   Button A  → GPIO 21   Button B  → GPIO 20   Button C  → GPIO 16
-#   Joystick Up   → GPIO 6    Down → GPIO 19   Left → GPIO 5
-#   Joystick Right → GPIO 26  Select → GPIO 13
+#   Button A  → GPIO 21   (Next / cycle menu item)
+#   Button B  → GPIO 20   (Back / previous item)
+#   Button C  → GPIO 16   (Push-to-Talk — hold to speak, release to send)
+#
+# Note: The joystick has been removed. Navigation is fully button + voice driven.
 # =============================================================================
 
 import configparser
@@ -42,36 +42,26 @@ try:
     import RPi.GPIO as GPIO
     _GPIO_AVAILABLE = True
 except ImportError:
-    log.warning("RPi.GPIO not found — button/joystick input disabled.")
+    log.warning("RPi.GPIO not found — button input disabled.")
     _GPIO_AVAILABLE = False
 
 
 # =============================================================================
 # GPIO pin assignments (BCM numbering — Waveshare Play Hat)
+# Joystick has been removed. Only the three physical buttons are used.
 # =============================================================================
-PIN_BTN_A     = 21   # Button A (leftmost)
-PIN_BTN_B     = 20   # Button B (middle)
-PIN_BTN_C     = 16   # Button C (right)
-PIN_JOY_UP    = 6    # Joystick Up
-PIN_JOY_DOWN  = 19   # Joystick Down
-PIN_JOY_LEFT  = 5    # Joystick Left
-PIN_JOY_RIGHT = 26   # Joystick Right
-PIN_JOY_SEL   = 13   # Joystick push (SELECT)
+PIN_BTN_A = 21   # Button A — Next / cycle menu item
+PIN_BTN_B = 20   # Button B — Back / previous menu item
+PIN_BTN_C = 16   # Button C — Push-to-Talk (walkie-talkie)
 
-# Map GPIO pin → event name (used in event queue)
-_PIN_TO_EVENT: dict[int, str] = {
-    PIN_BTN_A:     "A",
-    PIN_BTN_B:     "B",
-    PIN_BTN_C:     "C",
-    PIN_JOY_UP:    "UP",
-    PIN_JOY_DOWN:  "DOWN",
-    PIN_JOY_LEFT:  "LEFT",
-    PIN_JOY_RIGHT: "RIGHT",
-    PIN_JOY_SEL:   "SELECT",
+# Standard press-only buttons (falling edge = active-low press)
+_PRESS_PINS: dict[int, str] = {
+    PIN_BTN_A: "A",
+    PIN_BTN_B: "B",
 }
 
-# All input pins in one list for easy setup
-_ALL_INPUT_PINS = list(_PIN_TO_EVENT.keys())
+# All input pins — used for GPIO.setup
+_ALL_INPUT_PINS = [PIN_BTN_A, PIN_BTN_B, PIN_BTN_C]
 
 # Display dimensions (SSD1306 on Waveshare Play Hat)
 OLED_WIDTH  = 128
@@ -86,8 +76,14 @@ FONT_SMALL = None   # Loaded in __init__; default PIL font is 8px
 # =============================================================================
 class OLEDDisplay:
     """
-    Full OLED driver with double-buffering, button/joystick input queue,
+    Full OLED driver with double-buffering, button input queue,
     and pre-built UI primitives for PentestGPT-lite.
+
+    Button events pushed to the queue:
+      "A"         — Button A pressed (next / cycle)
+      "B"         — Button B pressed (back / previous)
+      "C_PRESS"   — Button C pressed (PTT start recording)
+      "C_RELEASE" — Button C released (PTT stop / process)
 
     If hardware is not available (non-Pi host), all draw calls are no-ops
     and poll_event() returns None — enabling headless testing.
@@ -141,33 +137,59 @@ class OLEDDisplay:
             GPIO.setwarnings(False)
             for pin in _ALL_INPUT_PINS:
                 GPIO.setup(pin, GPIO.IN, pull_up_down=GPIO.PUD_UP)
-                # Falling edge = button pressed (active-low with pull-up)
+
+            # Buttons A and B: falling edge only (press detection)
+            for pin, _event in _PRESS_PINS.items():
                 GPIO.add_event_detect(
                     pin, GPIO.FALLING,
                     callback=self._gpio_callback,
                     bouncetime=150,  # 150 ms debounce
                 )
-            log.info("GPIO inputs configured: %s", _ALL_INPUT_PINS)
+
+            # Button C: both edges for push-to-talk (press + release)
+            GPIO.add_event_detect(
+                PIN_BTN_C, GPIO.BOTH,
+                callback=self._gpio_ptt_callback,
+                bouncetime=50,   # Shorter debounce for PTT responsiveness
+            )
+
+            log.info("GPIO inputs configured (buttons only, no joystick): %s",
+                     _ALL_INPUT_PINS)
         except Exception as exc:
             log.warning("GPIO setup failed: %s — input events disabled.", exc)
 
     def _gpio_callback(self, pin: int) -> None:
         """
-        ISR called by RPi.GPIO on falling edge.
+        ISR called by RPi.GPIO on falling edge for Buttons A and B.
         Pushes event name to queue (non-blocking; drops if queue full).
         """
-        event = _PIN_TO_EVENT.get(pin)
+        event = _PRESS_PINS.get(pin)
         if event:
             try:
                 self._event_q.put_nowait(event)
             except queue.Full:
                 pass  # Drop event rather than block the ISR
 
+    def _gpio_ptt_callback(self, pin: int) -> None:
+        """
+        ISR called by RPi.GPIO on BOTH edges for Button C (Push-to-Talk).
+        Falling edge (LOW) → "C_PRESS"  (user starts speaking)
+        Rising  edge (HIGH) → "C_RELEASE" (user releases button)
+        """
+        if not _GPIO_AVAILABLE:
+            return
+        state = GPIO.input(pin)
+        event = "C_PRESS" if state == GPIO.LOW else "C_RELEASE"
+        try:
+            self._event_q.put_nowait(event)
+        except queue.Full:
+            pass
+
     # ── Event polling ─────────────────────────────────────────────────────────
     def poll_event(self) -> Optional[str]:
         """
         Non-blocking event poll.
-        Returns event string ("UP", "A", "SELECT", …) or None if no event.
+        Returns event string ("A", "B", "C_PRESS", "C_RELEASE") or None if no event.
         """
         try:
             return self._event_q.get_nowait()
@@ -409,14 +431,32 @@ class OLEDDisplay:
 
         self.refresh()
 
+    # ── Push-to-Talk listening indicator ──────────────────────────────────────
+    def show_listening(self) -> None:
+        """
+        Display the PTT 'Listening...' indicator while Button C is held.
+        Shown immediately on C_PRESS so the user knows the mic is live.
+        """
+        with self._lock:
+            self._clear_buf()
+            self._draw.rectangle((0, 0, OLED_WIDTH - 1, OLED_HEIGHT - 1),
+                                  outline=1, fill=0)
+            self._text(28, 8,  "[ LISTENING ]")
+            self._text(20, 24, "Hold to speak,")
+            self._text(16, 36, "release to send.")
+            # Animated mic icon (simple rectangle as microphone body)
+            self._draw.rectangle((60, 46, 68, 58), outline=1, fill=1)
+            self._draw.arc((56, 44, 72, 60), 180, 0, fill=1)
+        self.refresh()
+
     # ── Text prompt (for entering target URLs etc.) ───────────────────────────
     def prompt_text(self, label: str) -> Optional[str]:
         """
-        Very simple text entry: cycles through chars with joystick.
-        In practice, users set targets in config.ini or via SSH.
-        Returns None if user cancels (Button B).
+        Text entry is not supported on this hardware without a keyboard.
+        Users should set targets in config.ini or via SSH.
+        For voice-driven input, use the PTT button (Button C).
+        Returns None so callers fall back to configured defaults.
         """
-        # On hardware without a keyboard, we just return None to use the default
         log.info("Text prompt ('%s') — no keyboard; returning None.", label)
         return None
 

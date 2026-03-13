@@ -31,3 +31,11 @@ smbus2==0.4.3
 
 # HTTP client — offline fallback; no live API calls made in this codebase
 requests==2.32.3
+
+# Push-to-Talk voice input — offline speech recognition (Vosk) + audio capture (PyAudio)
+# PyAudio requires the portaudio19-dev system package:
+#   sudo apt install portaudio19-dev
+# Vosk small English model (~40 MB) is downloaded by setup.sh to:
+#   /home/pi/models/vosk-model-small-en-us/
+vosk==0.3.45
+pyaudio==0.2.14
