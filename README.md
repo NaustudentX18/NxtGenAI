@@ -21,7 +21,7 @@ See LICENSE file for full text.
 ┌──────────────────────────┐
 │  ██████████████████████  │  ← 128×64 OLED (SSD1306)
 │  ██  PentestGPT-lite  ██  │
-│  ██  [WiFi Crack     ] ██  │  ← Joystick selects mode
+│  ██  [WiFi Crack     ] ██  │  ← Button A cycles mode
 │  ██  [Web Pentest    ] ██  │
 │  ██  [Network Recon  ] ██  │
 │  ██  [Full Auto (AI) ] ██  │
@@ -39,7 +39,7 @@ See LICENSE file for full text.
 |---|---|---|
 | SBC | Raspberry Pi Zero 2 W | ARMv8, 512 MB RAM |
 | Battery HAT | PiSugar 3 | I2C power monitor, USB-C charge |
-| Display HAT | Waveshare Play Hat | SSD1306 128×64 OLED, 3 buttons, joystick |
+| Display HAT | Waveshare Play Hat | SSD1306 128×64 OLED, 3 buttons |
 | Storage | microSD ≥ 8 GB | Class 10 / A1 recommended |
 | OS | Raspberry Pi OS Lite (Bookworm) | 64-bit, headless |
 
@@ -62,7 +62,7 @@ sudo reboot
 ```
 
 > **First Boot:** OLED shows animated splash, voice says  
-> *"Welcome to PentestGPT-lite. Joystick to start."*
+> *"Welcome to PentestGPT-lite. Press button A to cycle modes, button B to go back. Hold button C to speak a voice command."*
 
 ---
 
@@ -81,11 +81,10 @@ sudo reboot
 
 | Input | Action |
 |---|---|
-| Joystick Up/Down | Scroll menu |
-| Joystick Push | Confirm selection |
-| Button A | Run / Start |
+| Button A | Next / cycle menu item |
 | Button B | Back / Cancel |
-| Button C | Export report to USB |
+| Button C (hold) | Push-to-Talk — speak a voice command |
+| Button C (release) | Send / confirm voice input |
 
 ### Report Output
 
@@ -93,7 +92,7 @@ Completed sessions auto-generate:
 - `report_YYYYMMDD_HHMMSS.json` — machine-readable findings
 - `report_YYYYMMDD_HHMMSS.html` — dark Bootstrap 5 single-file HTML
 
-Copy to USB stick with Button C.
+Copy to USB stick by saying *"export"* via voice command (Button C hold → speak → release).
 
 ---
 
@@ -119,7 +118,7 @@ NxtGenAI/
 ├── setup.sh          # One-command installer
 ├── main.py           # Boot splash → LLM load → main loop
 ├── ai_core.py        # ReAct reasoning + risk scoring
-├── ui.py             # OLED driver + buttons + joystick
+├── ui.py             # OLED driver + buttons (A/B/C)
 ├── tools.py          # nmap, hydra, aireplay-ng, sqlmap, ARP
 ├── power.py          # PiSugar I2C + low-power management
 ├── config.ini        # Paths, thresholds, model config
