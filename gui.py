@@ -1614,7 +1614,7 @@ def main() -> None:
     if not os.path.isabs(cfg_path):
         cfg_path = os.path.join(script_dir, cfg_path)
 
-    cfg = configparser.ConfigParser()
+    cfg = configparser.ConfigParser(inline_comment_prefixes=("#", ";"))
     if os.path.exists(cfg_path):
         cfg.read(cfg_path)
         log.info("Loaded config from %s", cfg_path)

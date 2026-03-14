@@ -49,18 +49,24 @@ from voice_input import VoiceInput  # Push-to-talk offline STT
 # =============================================================================
 # Logging setup
 # =============================================================================
+_LOG_DIR = "/home/pi/reports"
+_log_handlers: list = [logging.StreamHandler(sys.stdout)]
+try:
+    os.makedirs(_LOG_DIR, exist_ok=True)
+    _log_handlers.append(
+        logging.handlers.RotatingFileHandler(
+            os.path.join(_LOG_DIR, "pentestgpt.log"),
+            maxBytes=1_048_576,  # 1 MB
+            backupCount=2,
+        )
+    )
+except OSError:
+    pass  # Log to stdout only when running outside Pi environment
+
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
-    handlers=[
-        logging.StreamHandler(sys.stdout),
-        # Rotate log file so it never fills the SD card
-        logging.handlers.RotatingFileHandler(
-            "/home/pi/reports/pentestgpt.log",
-            maxBytes=1_048_576,  # 1 MB
-            backupCount=2,
-        ),
-    ],
+    handlers=_log_handlers,
 )
 log = logging.getLogger("main")
 
@@ -120,8 +126,8 @@ class PentestGPTApp:
     @staticmethod
     def _load_config() -> configparser.ConfigParser:
         """Load config.ini; fall back to bundled defaults if file missing."""
-        cfg = configparser.ConfigParser()
-        cfg_path = os.path.join(os.path.dirname(__file__), "config.ini")
+        cfg = configparser.ConfigParser(inline_comment_prefixes=("#", ";"))
+        cfg_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "config.ini")
         if not os.path.exists(cfg_path):
             log.warning("config.ini not found — using built-in defaults.")
             return cfg  # All reads will use fallback values

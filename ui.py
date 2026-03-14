@@ -27,12 +27,19 @@ from typing import Optional
 
 log = logging.getLogger(__name__)
 
+# PIL is needed for the image buffer even in headless mode
+try:
+    from PIL import Image, ImageDraw
+    _PIL_AVAILABLE = True
+except ImportError:
+    log.warning("Pillow not installed — OLED draw calls will be no-ops.")
+    _PIL_AVAILABLE = False
+
 # Optional hardware imports — gracefully degrade if not on Pi
 try:
     import board
     import busio
     import adafruit_ssd1306
-    from PIL import Image, ImageDraw
     _HW_AVAILABLE = True
 except ImportError:
     log.warning("Adafruit SSD1306 libs not found — running in headless mode.")
@@ -97,8 +104,12 @@ class OLEDDisplay:
         self._event_q: queue.Queue[str] = queue.Queue(maxsize=8)
 
         # PIL image buffer (drawn off-screen, pushed to OLED in refresh())
-        self._image  = Image.new("1", (OLED_WIDTH, OLED_HEIGHT), 0)
-        self._draw   = ImageDraw.Draw(self._image)
+        if _PIL_AVAILABLE:
+            self._image  = Image.new("1", (OLED_WIDTH, OLED_HEIGHT), 0)
+            self._draw   = ImageDraw.Draw(self._image)
+        else:
+            self._image  = None
+            self._draw   = None
 
         # OLED device handle
         self._oled: Optional[object] = None
@@ -199,14 +210,20 @@ class OLEDDisplay:
     # ── Internal draw helpers ─────────────────────────────────────────────────
     def _clear_buf(self) -> None:
         """Clear PIL image buffer to black."""
+        if self._draw is None:
+            return
         self._draw.rectangle((0, 0, OLED_WIDTH, OLED_HEIGHT), fill=0)
 
     def _text(self, x: int, y: int, text: str, fill: int = 1) -> None:
         """Draw text to buffer. fill=1 = white, fill=0 = black."""
+        if self._draw is None:
+            return
         self._draw.text((x, y), text, font=FONT_SMALL, fill=fill)
 
     def _hline(self, y: int) -> None:
         """Draw a full-width horizontal line."""
+        if self._draw is None:
+            return
         self._draw.line((0, y, OLED_WIDTH - 1, y), fill=1)
 
     def _bar(self, x: int, y: int, w: int, h: int,
@@ -215,6 +232,8 @@ class OLEDDisplay:
         Draw a progress/battery bar.
         filled_pct: 0.0–1.0
         """
+        if self._draw is None:
+            return
         # Outline
         self._draw.rectangle((x, y, x + w, y + h), outline=1, fill=0)
         # Filled portion
