@@ -30,7 +30,7 @@ import sys
 import threading
 import time
 import tkinter as tk
-from tkinter import messagebox, scrolledtext, ttk
+from tkinter import scrolledtext, ttk
 
 log = logging.getLogger(__name__)
 
