@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # =============================================================================
-# PentestGPT-lite — Pentest Tool Runner
+# NxtGenAI — Pentest Tool Runner
 # =============================================================================
 # MIT License — Copyright (c) 2026 DINA OKTARIANA
 #

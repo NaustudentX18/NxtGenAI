@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # =============================================================================
-# PentestGPT-lite — AI Core (ReAct Reasoning Loop)
+# NxtGenAI — AI Core (ReAct Reasoning Loop)
 # =============================================================================
 # MIT License — Copyright (c) 2026 DINA OKTARIANA
 #
@@ -49,7 +49,7 @@ except ImportError:
 
 # System prompt: shapes the model into a cautious red-team assistant
 SYSTEM_PROMPT = (
-    "You are PentestGPT-lite, an offline AI pentesting assistant running on "
+    "You are NxtGenAI, an offline AI pentesting assistant running on "
     "a Raspberry Pi. You help authorised security professionals test their own "
     "networks. You are cautious, methodical, and always explain your reasoning.\n"
     "Available tools: nmap_scan, wifi_crack, web_pentest, arp_spoof, sqlmap, "

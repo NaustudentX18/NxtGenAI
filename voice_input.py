@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # =============================================================================
-# PentestGPT-lite — Voice Input (Push-to-Talk / Walkie-Talkie)
+# NxtGenAI — Voice Input (Push-to-Talk / Walkie-Talkie)
 # =============================================================================
 # MIT License — Copyright (c) 2026 DINA OKTARIANA
 #

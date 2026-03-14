@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # =============================================================================
-# PentestGPT-lite — OLED Display Driver
+# NxtGenAI — OLED Display Driver
 # =============================================================================
 # MIT License — Copyright (c) 2026 DINA OKTARIANA
 #
@@ -77,7 +77,7 @@ FONT_SMALL = None   # Loaded in __init__; default PIL font is 8px
 class OLEDDisplay:
     """
     Full OLED driver with double-buffering, button input queue,
-    and pre-built UI primitives for PentestGPT-lite.
+    and pre-built UI primitives for NxtGenAI.
 
     Button events pushed to the queue:
       "A"         — Button A pressed (next / cycle)
@@ -285,13 +285,13 @@ class OLEDDisplay:
         """Frame 3: border + title."""
         self._draw.rectangle((0, 0, OLED_WIDTH - 1, OLED_HEIGHT - 1),
                               outline=1, fill=0)
-        self._text(14, 18, "PentestGPT-lite")
+        self._text(14, 18, "NxtGenAI")
 
     def _splash_frame_4(self) -> None:
         """Frame 4: border + title + tagline + shield icon."""
         self._draw.rectangle((0, 0, OLED_WIDTH - 1, OLED_HEIGHT - 1),
                               outline=1, fill=0)
-        self._text(14, 16, "PentestGPT-lite")
+        self._text(14, 16, "NxtGenAI")
         self._hline(27)
         self._text(20, 30, "AI Pentester")
         self._text(28, 42, "v1.0.0")
