@@ -30,6 +30,7 @@
 
 import configparser
 import logging
+import logging.handlers
 import os
 import signal
 import subprocess
@@ -62,9 +63,6 @@ logging.basicConfig(
     ],
 )
 log = logging.getLogger("main")
-
-# Add RotatingFileHandler (import at top would fail if logging not configured)
-import logging.handlers  # noqa: E402 — placed after basicConfig intentionally
 
 
 # =============================================================================
@@ -445,7 +443,12 @@ class PentestGPTApp:
             self._announce_current_item()
             return False
 
-        if "back" in t or "previous" in t or "cancel" in t:
+        if "back" in t or "previous" in t:
+            self.selected_mode_idx = (self.selected_mode_idx - 1) % len(MODES)
+            self._announce_current_item()
+            return False
+
+        if "cancel" in t:
             self._announce_current_item()
             return False
 

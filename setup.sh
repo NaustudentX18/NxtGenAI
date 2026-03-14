@@ -67,7 +67,7 @@ PACKAGES=(
     # Desktop GUI (Tkinter — required for python3 gui.py)
     python3-tk
     # Pentest tools
-    nmap hydra aircrack-ng aireplay-ng sqlmap
+    nmap hydra aircrack-ng sqlmap
     # Voice output
     espeak-ng
     # Voice input — PyAudio requires PortAudio development headers
