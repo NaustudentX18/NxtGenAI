@@ -1,0 +1,1187 @@
+================================================================================
+  NxtGenAI — COMPLETE TIP SHEET
+  Professional Penetration Testing Reference Guide
+  For use with: Raspberry Pi Zero 2 W + Whisplay Pi AI Hat + PiSugar 3
+================================================================================
+  MIT License — Copyright (c) 2026 DINA OKTARIANA
+  For authorised professional use only.
+================================================================================
+
+TABLE OF CONTENTS
+─────────────────
+  1.  Hardware Quick Reference
+  2.  Button Controls
+  3.  Voice Commands — Full Reference
+  4.  GUI Keyboard Shortcuts
+  5.  Config Tuning Reference
+  6.  Pentest Modes — What They Do
+  7.  AI Voice Prompt Ideas (Full Auto Mode)
+  8.  Real-World Engagement Scenarios
+  9.  Network Reconnaissance — Tips & Tricks
+  10. WiFi Auditing — Tips & Tricks
+  11. Web Application Testing — Tips & Tricks
+  12. Brute Force & Credential Auditing
+  13. Report Generation & Evidence Collection
+  14. Workflow Examples (Start to Finish)
+  15. Field Deployment Tips
+  16. Troubleshooting
+
+
+================================================================================
+  SECTION 1 — HARDWARE QUICK REFERENCE
+================================================================================
+
+  Device           : Raspberry Pi Zero 2 W
+  OS               : Raspberry Pi OS Lite 64-bit (Bookworm)
+  RAM              : 512 MB (TinyLlama uses ~180 MB, leaves ~280 MB for OS + tools)
+  Display          : SSD1306 128×64 OLED (I2C 0x3C, bus 1)
+  Battery          : PiSugar 3 (I2C 0x57, bus 1)
+  Audio Out        : 3.5 mm jack or USB speaker (espeak-ng TTS)
+  Audio In         : USB microphone or Whisplay onboard mic (Vosk STT, 16 kHz mono)
+  Wireless         : Built-in wlan0 (can add USB WiFi for monitor mode)
+  GPIO Buttons     : A=GPIO21, B=GPIO20, C=GPIO16 (BCM numbering)
+
+  I2C Device Map (check with: i2cdetect -y 1)
+  ─────────────────────────────────────────────
+    0x3C  → SSD1306 OLED display
+    0x57  → PiSugar 3 battery management
+
+  Key Paths on Pi
+  ─────────────────────────────────────────────
+    App files       : /home/pi/NxtGenAI/
+    Config          : /home/pi/NxtGenAI/config.ini
+    Python venv     : /home/pi/pentestgpt-venv/
+    LLM model       : /home/pi/models/tinyllama-1.1b-q4_0.gguf
+    Vosk model      : /home/pi/models/vosk-model-small-en-us/
+    Reports output  : /home/pi/reports/
+    Wordlist (fast) : /home/pi/wordlists/10k-common.txt
+    Wordlist (full) : /home/pi/wordlists/rockyou.txt
+    Log file        : /home/pi/reports/pentestgpt.log
+    Systemd service : /etc/systemd/system/pentestgpt.service
+
+
+================================================================================
+  SECTION 2 — BUTTON CONTROLS
+================================================================================
+
+  ┌──────────────────────────────────────────────────────────────┐
+  │  Button A  (GPIO 21)  ─  NEXT                                │
+  │    • In MENU    : Cycle to next pentest mode, announces aloud │
+  │    • In RESULT  : Scroll down one line                        │
+  ├──────────────────────────────────────────────────────────────┤
+  │  Button B  (GPIO 20)  ─  BACK                                │
+  │    • In MENU    : Cycle to previous pentest mode              │
+  │    • In RESULT  : Return to main menu                         │
+  ├──────────────────────────────────────────────────────────────┤
+  │  Button C  (GPIO 16)  ─  PUSH-TO-TALK (hold = record)        │
+  │    • HOLD       : Mic activates, OLED shows [ LISTENING ]     │
+  │    • RELEASE    : Speech recognised, command executed         │
+  │    • If no mic  : Acts as SELECT (confirms current mode)      │
+  └──────────────────────────────────────────────────────────────┘
+
+  TIP: Button C is walkie-talkie style — hold while speaking, release to send.
+  TIP: You can navigate the whole device with one hand using just 3 buttons.
+  TIP: Button A announces the mode name aloud — useful in the dark or glancing away.
+
+
+================================================================================
+  SECTION 3 — VOICE COMMANDS — FULL REFERENCE
+================================================================================
+
+  Activate voice input: Hold Button C (hardware) or hold SPACE (GUI)
+
+  ── MODE SELECTION ─────────────────────────────────────────────────────────────
+
+  Command phrase                  → Action
+  ─────────────────────────────────────────────────────────────────────────────
+  "wifi"                          → Select WiFi Crack mode
+  "wifi crack"                    → Select WiFi Crack mode
+  "crack wifi"                    → Select WiFi Crack mode
+  "web"                           → Select Web Pentest mode
+  "web pentest"                   → Select Web Pentest mode
+  "web test"                      → Select Web Pentest mode
+  "recon"                         → Select Network Recon mode
+  "network"                       → Select Network Recon mode
+  "network scan"                  → Select Network Recon mode
+  "network recon"                 → Select Network Recon mode
+  "auto"                          → Select Full Auto (AI) mode
+  "full auto"                     → Select Full Auto (AI) mode
+  "ai"                            → Select Full Auto (AI) mode
+  "automatic"                     → Select Full Auto (AI) mode
+
+  ── NAVIGATION ─────────────────────────────────────────────────────────────────
+
+  "next"                          → Advance to next menu item
+  "back"                          → Go to previous menu item
+  "previous"                      → Go to previous menu item
+  "cancel"                        → Re-announce current item (stay in menu)
+
+  ── CONFIRMATION ───────────────────────────────────────────────────────────────
+
+  "select"                        → Confirm and start current mode
+  "yes"                           → Confirm and start current mode
+  "ok"                            → Confirm and start current mode
+  "confirm"                       → Confirm and start current mode
+  "go"                            → Confirm and start current mode
+  "start"                         → Confirm and start current mode
+
+  ── RESULT SCREEN ──────────────────────────────────────────────────────────────
+
+  "export"                        → Copy report to USB drive
+  "usb"                           → Copy report to USB drive
+  "save"                          → Copy report to USB drive
+  "back"                          → Return to main menu
+  "menu"                          → Return to main menu
+
+  ── BEST PRACTICE TIPS ─────────────────────────────────────────────────────────
+
+  • Speak clearly and at normal pace — Vosk is trained on natural speech
+  • Short commands work best: say "wifi" not "I would like to run wifi crack"
+  • Ambient noise > 70 dB may cause recognition errors — cup your hand over mic
+  • If command not recognised you will hear "Command not recognised, try again"
+  • The OLED shows [ LISTENING ] while Button C is held — that's your cue
+  • Vosk runs 100% offline — no cloud, no delay, no data sent anywhere
+
+
+================================================================================
+  SECTION 4 — GUI KEYBOARD SHORTCUTS
+================================================================================
+
+  Run GUI with: python3 /home/pi/NxtGenAI/gui.py
+
+  Key              Action
+  ────────────────────────────────────────────────────────────────
+  SPACE (hold)   → Push-to-Talk voice input (same as Button C)
+  F1             → Toggle the full command & voice guide panel
+  F5             → Reset / restart buddy session (clears log)
+  Ctrl+Q         → Quit the application safely
+
+  ── CHARACTER SELECTION SCREEN ─────────────────────────────────
+
+  Click any character card to select your AI pentest companion:
+
+    👻 G.H.O.S.T  — Ghost    (purple glow, sneaky recon specialist)
+    🥷 N.I.N.J.A  — Ninja    (green glow, silent precision)
+    🤖 R.O.B.O.T  — Robot    (blue glow, methodical automation)
+    💀 H.A.C.K.E.R— Hacker   (red glow, old-school aggressive)
+
+  Each character has unique:
+    • Idle / thinking / talking / happy / alert / scanning animations
+    • Personality phrases that appear during tool execution
+    • Colour scheme applied throughout the entire UI
+
+  ── GUI FEATURES ────────────────────────────────────────────────
+
+  • AI output log with typewriter animation — text appears character by character
+  • Colour-coded risk bars per action (green=safe, amber=caution, red=danger)
+  • Live battery percentage from PiSugar 3 in the header
+  • Rotating tip bar at the bottom (new tip every 6 seconds)
+  • Dark cyberpunk colour theme — easy on the eyes in dark environments
+  • All pentest output streamed live to the log panel as it runs
+
+
+================================================================================
+  SECTION 5 — CONFIG TUNING REFERENCE
+================================================================================
+
+  Edit with: nano /home/pi/NxtGenAI/config.ini
+  Restart after changes: sudo systemctl restart pentestgpt
+
+  ── [paths] ────────────────────────────────────────────────────
+
+  model       = /home/pi/models/tinyllama-1.1b-q4_0.gguf
+    ↳ Swap for Phi-2-2.7B-Q4_0 for better reasoning (uses ~400 MB more RAM)
+    ↳ Any GGUF model compatible with llama-cpp-python works here
+
+  wordlists   = /home/pi/wordlists/
+  rockyou     = /home/pi/wordlists/rockyou.txt
+    ↳ Replace with custom wordlists for targeted engagements
+
+  common10k   = /home/pi/wordlists/10k-common.txt
+    ↳ Used for fast hydra brute (10k passes in <2 min on SSH)
+
+  reports     = /home/pi/reports/
+    ↳ Change to a USB mount point to auto-save reports externally
+
+  usb_mount   = /media/pi/
+    ↳ USB drives appear here when plugged in; Button C exports to first found
+
+  ── [llm] ──────────────────────────────────────────────────────
+
+  n_ctx        = 512
+    ↳ Context window tokens. Increase to 1024 if you have swap headroom.
+    ↳ Higher = better reasoning but more RAM. 512 is safe on Zero 2 W.
+
+  n_threads    = 3
+    ↳ Pi Zero 2 W has 4 cores. Use 3 to leave one for UI responsiveness.
+    ↳ Set to 4 for maximum inference speed (OLED may lag slightly).
+
+  max_tokens   = 200
+    ↳ Max tokens per LLM response. 200 keeps responses concise.
+    ↳ Increase to 400 for more detailed AI reasoning.
+
+  temperature  = 0.3
+    ↳ Lower = more deterministic (good for pentest steps).
+    ↳ 0.0 = fully deterministic. 1.0 = creative/random.
+
+  repeat_penalty = 1.1
+    ↳ Prevents the LLM from looping on the same phrase.
+
+  ── [oled] ─────────────────────────────────────────────────────
+
+  i2c_address = 0x3C
+    ↳ Most SSD1306 OLEDs are 0x3C. Some are 0x3D. Run i2cdetect to confirm.
+
+  brightness_normal = 200
+    ↳ 0–255. 200 is bright. Reduce for battery saving.
+
+  brightness_dim = 80
+    ↳ Applied automatically when battery drops below threshold_warn.
+
+  refresh_rate = 0.1
+    ↳ OLED updates every 100 ms (10 fps). Lower = smoother but more CPU.
+
+  ── [power] ────────────────────────────────────────────────────
+
+  threshold_warn  = 20
+    ↳ Voice warning + OLED dim kicks in at this battery %.
+
+  threshold_sleep = 10
+    ↳ Saves current report and initiates safe shutdown at this %.
+
+  poll_interval = 30
+    ↳ Reads battery every 30 seconds. Reduce to 10 for faster response.
+
+  ── [security] ─────────────────────────────────────────────────
+
+  max_risk_score = 10
+    ↳ Actions above this score are auto-skipped in Full Auto mode.
+    ↳ Set to 10 to allow all actions (recommended for professional use).
+    ↳ Set to 5 to only allow passive/read-only actions.
+
+  confirm_threshold = 10
+    ↳ Actions at or above this score require voice confirmation.
+    ↳ Set to 10 to disable all confirmation prompts.
+
+  ── [audio] ────────────────────────────────────────────────────
+
+  vosk_model  = /home/pi/models/vosk-model-small-en-us
+    ↳ Swap for vosk-model-en-us-0.22 (~1.8 GB) for significantly
+      better recognition accuracy on noisy networks or thick accents.
+
+  rate        = 16000
+    ↳ Must match Vosk model (16000 Hz for all small/medium models).
+
+  channels    = 1
+    ↳ Mono mic input. Stereo inputs are auto-mixed to mono by PyAudio.
+
+  ── [wifi] ─────────────────────────────────────────────────────
+
+  interface = wlan0
+    ↳ Built-in WiFi. For monitor mode, plug in a USB adapter and change
+      this to wlan1. Recommended adapters: Alfa AWUS036ACH, TP-Link TL-WN722N.
+
+  capture_timeout = 60
+    ↳ How long airodump-ng runs before attempting crack.
+    ↳ Increase to 120+ if the target network is quiet.
+
+  ── [voice] ────────────────────────────────────────────────────
+
+  voice     = en-gb
+    ↳ espeak-ng voice. Options: en-us, en-gb, en-au, en-in, de, fr, es
+    ↳ Full list: espeak-ng --voices
+
+  speed     = 130
+    ↳ Words per minute. Lower = clearer on small speakers. Range: 80–400.
+
+  amplitude = 100
+    ↳ Volume. 0–200. 100 is default. 200 is maximum.
+
+
+================================================================================
+  SECTION 6 — PENTEST MODES — WHAT THEY DO
+================================================================================
+
+  ── MODE 1: NETWORK RECON ──────────────────────────────────────
+
+  Voice command: "network scan" or "recon"
+  Risk score: 2–3 (passive, read-only)
+
+  Step-by-step:
+    1. nmap -sn (ping sweep) — discovers all live hosts on /24 subnet
+    2. nmap -sS -T3 --open — SYN scan on discovered hosts
+       Ports scanned: 22 (SSH), 80 (HTTP), 443 (HTTPS), 8080, 3306 (MySQL)
+
+  Output includes:
+    • IP addresses of all live hosts
+    • Open ports per host
+    • Service banner information
+    • Estimated OS fingerprint
+
+  Best for:
+    • First step in any engagement — always start here
+    • Mapping an unknown network before targeted attacks
+    • Identifying exposed services on client's internal network
+    • Verifying firewall rules are working as expected
+
+  ── MODE 2: WIFI CRACK ──────────────────────────────────────────
+
+  Voice command: "wifi crack" or "wifi"
+  Risk score: 5–7 (active, requires monitor mode)
+
+  Step-by-step:
+    1. airmon-ng start wlan0      — enables monitor mode on wlan0mon
+    2. airodump-ng                — scans for nearby access points (60 s)
+    3. aireplay-ng -0             — sends 1 deauth frame to force handshake
+    4. aircrack-ng -w rockyou.txt — dictionary attack on captured .cap file
+    5. airmon-ng stop             — restores managed mode
+
+  Output includes:
+    • List of detected SSIDs and BSSIDs
+    • Signal strength per AP
+    • Captured .cap file (stored in /tmp during run)
+    • Cracked password (if in wordlist)
+
+  Best for:
+    • Testing WPA2 PSK strength on client WiFi
+    • Demonstrating why weak passwords are dangerous
+    • Wireless security assessments
+    • Red team engagements with physical access on-site
+
+  NOTE: Built-in Pi wlan0 does NOT support monitor mode.
+        Use a USB WiFi adapter (Alfa AWUS036ACH recommended).
+        Change config.ini [wifi] interface = wlan1 after plugging in.
+
+  ── MODE 3: WEB PENTEST ─────────────────────────────────────────
+
+  Voice command: "web pentest" or "web"
+  Risk score: 2–5 (active HTTP requests to target)
+
+  Step-by-step:
+    1. curl -I target              — grabs HTTP headers for analysis
+    2. sqlmap --batch --smart      — SQL injection detection (level 1, risk 1)
+
+  curl header analysis checks for:
+    • Server version disclosure (Apache/nginx version in Server: header)
+    • Missing X-Frame-Options (clickjacking vulnerability)
+    • Missing Content-Security-Policy
+    • Missing X-XSS-Protection
+    • Missing Strict-Transport-Security (HSTS)
+    • HTTP vs HTTPS usage
+
+  sqlmap checks for:
+    • Boolean-based blind SQL injection
+    • Time-based blind SQL injection
+    • Error-based SQL injection
+    • UNION query-based injection
+    • Stacked queries
+
+  Output includes:
+    • Full HTTP response headers
+    • List of detected SQL injection points
+    • Database type and version (if injectable)
+    • sqlmap session files in /home/pi/reports/
+
+  Best for:
+    • Quick web app security health check
+    • Demonstrating SQL injection risk to developers
+    • Pre-engagement recon on client web properties
+    • Testing after a developer claims they "fixed" SQLi
+
+  ── MODE 4: FULL AUTO (AI ORCHESTRATED) ─────────────────────────
+
+  Voice command: "full auto" or "auto" or "ai"
+  Risk score: varies (AI decides next action based on findings)
+
+  The AI ReAct loop runs up to 10 iterations:
+    Thought  → AI reasons about what to do next
+    Action   → AI calls a tool (nmap, sqlmap, hydra, etc.)
+    Observation → Tool output fed back to AI
+    Repeat   → AI decides next step based on observation
+
+  Tools available to the AI:
+    • nmap_scan     — network host discovery + port scan
+    • wifi_crack    — WPA2 handshake capture + crack
+    • web_pentest   — HTTP headers + SQL injection
+    • arp_spoof     — ARP cache poisoning (MitM position)
+    • sqlmap        — direct SQL injection testing
+    • hydra_brute   — dictionary brute force on any service
+    • report_done   — signals AI has finished, generates report
+
+  AI behaviour:
+    • Scores each action 1–10 before executing
+    • Skips actions above max_risk_score threshold
+    • Adapts strategy based on what each tool discovers
+    • Automatically generates a final report
+
+  Best for:
+    • Hands-free automated assessments
+    • Demonstrating AI-driven attack chaining to clients
+    • Running overnight assessments while you sleep
+    • Full engagement coverage with minimal operator input
+
+
+================================================================================
+  SECTION 7 — AI VOICE PROMPT IDEAS (FULL AUTO MODE)
+================================================================================
+
+  The default Full Auto task is: "Perform a comprehensive security assessment
+  of the local network." You can customise this in ai_core.py (_run_full_auto).
+
+  Here are ideas for targeted AI tasks you could hardcode or extend to support:
+
+  NETWORK FOCUSED
+  ──────────────────────────────────────────────────────────────────────────────
+  "Discover all hosts on 192.168.1.0/24 and identify any running SSH services"
+  "Find all web servers on the network and test for default credentials"
+  "Identify any unencrypted FTP servers and attempt anonymous login"
+  "Scan for all MySQL databases on port 3306 and attempt brute force"
+  "Map the entire network topology including router and gateway addresses"
+  "Find all hosts with port 445 open and check for SMB vulnerabilities"
+  "Discover printers, cameras, and IoT devices on the local network"
+  "Identify any hosts running Telnet and attempt login with default credentials"
+
+  WEB APPLICATION FOCUSED
+  ──────────────────────────────────────────────────────────────────────────────
+  "Test http://192.168.1.100 for SQL injection on all URL parameters"
+  "Audit http://target.local for missing security headers and TLS issues"
+  "Check http://192.168.1.1 admin panel for default username and password"
+  "Enumerate directories on http://192.168.1.50 and look for admin panels"
+  "Test the login form at http://192.168.1.100/login for credential stuffing"
+  "Check if http://192.168.1.200 discloses server version or error details"
+
+  WIFI FOCUSED
+  ──────────────────────────────────────────────────────────────────────────────
+  "Scan for all nearby WiFi networks and check for WEP encryption"
+  "Capture WPA2 handshake from the target SSID and crack with wordlist"
+  "Identify any open WiFi networks broadcasting in range"
+  "Check for rogue access points mimicking the client SSID"
+
+  CREDENTIAL FOCUSED
+  ──────────────────────────────────────────────────────────────────────────────
+  "Brute force SSH on 192.168.1.10 with username admin and rockyou wordlist"
+  "Test FTP server at 192.168.1.20 for anonymous access and weak passwords"
+  "Attack RDP on 192.168.1.30 with the 10k common password list"
+  "Attempt default credential login on router at 192.168.1.1"
+
+  COMBINED ASSESSMENT
+  ──────────────────────────────────────────────────────────────────────────────
+  "Perform a full black-box assessment starting with host discovery, then
+   target any web servers found for SQL injection, and brute force any
+   SSH services discovered"
+  "Chain network recon into web application testing on all discovered HTTP
+   services, then attempt credential brute force on any login panels found"
+
+
+================================================================================
+  SECTION 8 — REAL-WORLD ENGAGEMENT SCENARIOS
+================================================================================
+
+  ── SCENARIO 1: SMALL BUSINESS INTERNAL NETWORK AUDIT ──────────
+
+  Situation:
+    Client runs a small accountancy firm. They want to know if their internal
+    network is secure before applying for cyber insurance.
+
+  You walk in with the Pi in your pocket. It's running off PiSugar 3.
+  You plug a USB WiFi adapter into the Pi and SSH in over the LAN.
+
+  Steps:
+    1. Voice: "network scan" — maps all hosts on their LAN
+    2. Review OLED results — note any unexpected open ports
+    3. Voice: "web pentest" — target any internal web admin panels found
+    4. Voice: "wifi crack" — test their office WiFi password strength
+    5. Export report to USB: hold Button C, say "export"
+    6. Present JSON + HTML report to client — shows exactly what's exposed
+
+  Value delivered:
+    • Professional HTML report with dark Bootstrap 5 theme
+    • Risk-scored findings (1–10) for each issue found
+    • Evidence of SQL injection / weak WiFi password / open ports
+    • All generated in under 30 minutes, on-site, no laptop needed
+
+  ── SCENARIO 2: HOTEL / CONFERENCE WIFI SECURITY TEST ───────────
+
+  Situation:
+    A hotel chain hires you to test the security of their guest WiFi.
+    They want to know if one guest can see/attack another guest's traffic.
+
+  Setup:
+    • Connect Pi to hotel guest network via wlan0
+    • Plug Alfa WiFi adapter for monitor mode on wlan1
+
+  Steps:
+    1. Voice: "network scan" — discover all guests on the subnet
+    2. Note any hosts with open ports (SMB shares, Plex servers, etc.)
+    3. Voice: "full auto" — AI tries ARP spoof, MitM positioning
+    4. Check if the network segregates guest traffic (it should)
+    5. Voice: "export" — full evidence report for hotel management
+
+  Key findings this would surface:
+    • Guests visible to each other (flat network, no client isolation)
+    • Any unencrypted HTTP traffic between guests and internal services
+    • Whether network allows scanning/probing between clients
+    • Evidence of other guests with exposed Windows file shares
+
+  ── SCENARIO 3: PRE-BREACH ASSESSMENT FOR RETAIL CHAIN ──────────
+
+  Situation:
+    Retail client suspects they may have already been breached via their
+    POS (point-of-sale) systems. You need to assess the damage quickly.
+
+  Steps:
+    1. Voice: "network scan" — find all POS terminals, back-office PCs
+    2. Note any machines with unusual open ports (remote access tools)
+    3. Voice: "web pentest" against internal management portal
+    4. Voice: "full auto" — let AI chain recon + brute force + web tests
+    5. Review AI reasoning on OLED: Thought/Action/Observation loop
+    6. Export comprehensive report with all findings timestamped
+
+  Key findings this would surface:
+    • POS terminals running outdated Windows with exposed RDP
+    • Internal web portals with no authentication or default credentials
+    • Lateral movement paths between POS network and back-office network
+    • Evidence of existing unauthorised remote access tools
+
+  ── SCENARIO 4: RED TEAM PHYSICAL ENGAGEMENT ────────────────────
+
+  Situation:
+    You've been hired to physically access a client's office and test
+    network security from the inside. You have 2 hours.
+
+  Setup:
+    • Pi Zero 2 W is coin-sized — fits in a pocket, badge holder, or
+      disguised inside a fake power adapter or conference room clock
+    • PiSugar 3 provides 8–12 hours of battery
+    • SSH in over the LAN once planted behind a desk
+
+  Steps:
+    1. Plant the device on the network (ethernet or WiFi)
+    2. SSH in remotely over the client's LAN from your laptop in the car
+    3. Run: sudo systemctl start pentestgpt
+    4. Voice commands over SSH via text commands, or use Button C if nearby
+    5. Let Full Auto run for 60 minutes while you wait outside
+    6. Return, retrieve device, export report from USB
+
+  What this demonstrates to the client:
+    • A motivated attacker with physical access can map their entire network
+      in minutes without being noticed
+    • Internal systems assumed to be "safe" because they're internal are
+      often highly vulnerable
+    • The Pi produces a professional timestamped evidence report
+
+  ── SCENARIO 5: HOME LAB / TRAINING ENVIRONMENT ─────────────────
+
+  Situation:
+    Building your skills. Running a home lab with intentionally vulnerable
+    VMs (Metasploitable, DVWA, VulnHub machines).
+
+  Setup:
+    • Pi on same network as your lab VMs
+    • config.ini: max_risk_score = 10, confirm_threshold = 10
+
+  Practice scenarios:
+    1. Voice: "web pentest" against DVWA at 192.168.1.50
+       → Finds SQL injection, shows in report with exact payload
+    2. Voice: "network scan" against Metasploitable at 192.168.1.100
+       → Finds dozens of open ports to explore
+    3. Voice: "full auto" against full lab subnet
+       → AI chains recon → web test → brute force automatically
+    4. Review AI's Thought/Action/Observation reasoning on OLED
+       → Great for understanding AI-driven attack methodology
+
+  Value:
+    • Learn how AI reasons about attack chaining
+    • Practise reading and understanding pentest reports
+    • Build muscle memory for voice commands before live engagements
+
+  ── SCENARIO 6: WIRELESS SURVEY FOR OFFICE REFIT ───────────────
+
+  Situation:
+    Client is refitting their office and wants a WiFi heat map and
+    security audit of all SSIDs before handing over to permanent IT.
+
+  Steps:
+    1. Walk the office floor with Pi in pocket
+    2. Voice: "wifi crack" at each location
+    3. airodump-ng captures all visible SSIDs + signal strengths
+    4. Results per location exported to USB as JSON
+    5. Compile a room-by-room signal + security report
+
+  Findings this surfaces:
+    • Shadow IT access points (rogue APs employees set up themselves)
+    • SSIDs using WEP (should be WPA3 minimum)
+    • Weak WPA2 passwords crackable in seconds with rockyou
+    • Dead zones where signal is too weak for reliable connection
+
+  ── SCENARIO 7: DEVELOPER / DEVOPS SECURITY GATE ───────────────
+
+  Situation:
+    Your client's development team deploys a new web app. You test it
+    before it goes live to production.
+
+  Steps:
+    1. Target the staging environment URL
+    2. Voice: "web pentest" against staging.client.com
+    3. sqlmap finds injectable parameter in login form
+    4. curl shows server version disclosed in headers
+    5. Export report — developer team fixes issues before go-live
+
+  Value:
+    • Catch critical SQLi before it reaches production
+    • Automated evidence with exact injection payloads
+    • Report formatted for developers (HTML with dark Bootstrap 5 theme)
+    • Repeatable — run same test after developer fixes to verify
+
+
+================================================================================
+  SECTION 9 — NETWORK RECONNAISSANCE — TIPS & TRICKS
+================================================================================
+
+  QUICK COMMANDS (SSH into Pi and run manually for more control)
+  ──────────────────────────────────────────────────────────────────────────────
+
+  # Ping sweep — fastest host discovery
+  nmap -sn 192.168.1.0/24
+
+  # SYN scan all common ports (requires root)
+  sudo nmap -sS -T4 --open 192.168.1.0/24
+
+  # Full port scan on a specific host
+  sudo nmap -sS -p- -T4 192.168.1.100
+
+  # Service version detection
+  sudo nmap -sV 192.168.1.100
+
+  # OS fingerprinting
+  sudo nmap -O 192.168.1.100
+
+  # Aggressive scan (version + OS + scripts + traceroute)
+  sudo nmap -A 192.168.1.100
+
+  # Scan for specific vulnerabilities (NSE scripts)
+  sudo nmap --script vuln 192.168.1.100
+
+  # SMB vulnerabilities (EternalBlue check)
+  sudo nmap --script smb-vuln-ms17-010 -p 445 192.168.1.0/24
+
+  # HTTP title grabbing across whole subnet
+  sudo nmap --script http-title -p 80,443,8080,8443 192.168.1.0/24
+
+  # Scan with output to file
+  sudo nmap -sS -oA /home/pi/reports/scan_result 192.168.1.0/24
+
+  # ARP scan (faster than nmap ping on LAN)
+  sudo arp-scan --localnet
+
+  READING nmap OUTPUT
+  ──────────────────────────────────────────────────────────────────────────────
+  STATE    Meaning
+  open     Port is accepting connections — service is running
+  closed   Port is accessible but no service listening
+  filtered Firewall or ACL is blocking the probe
+  open|filtered  Cannot determine — common with UDP scans
+
+  COMMON PORTS TO WATCH FOR
+  ──────────────────────────────────────────────────────────────────────────────
+  21   FTP       — often anonymous login or brute-forceable
+  22   SSH       — brute force with hydra if password auth enabled
+  23   Telnet    — unencrypted, try default credentials immediately
+  25   SMTP      — open relay check, user enumeration
+  80   HTTP      — full web pentest
+  443  HTTPS     — web pentest + certificate check
+  445  SMB       — EternalBlue, pass-the-hash, ransomware entry point
+  3306 MySQL     — direct DB brute force if exposed
+  3389 RDP       — Windows remote desktop, brute force
+  5900 VNC       — often no authentication or weak password
+  8080 HTTP-alt  — often admin panels, Jenkins, Tomcat
+  8443 HTTPS-alt — alternative HTTPS admin panels
+
+
+================================================================================
+  SECTION 10 — WIFI AUDITING — TIPS & TRICKS
+================================================================================
+
+  MONITOR MODE SETUP (manual, for more control)
+  ──────────────────────────────────────────────────────────────────────────────
+
+  # Kill processes that interfere with monitor mode
+  sudo airmon-ng check kill
+
+  # Start monitor mode
+  sudo airmon-ng start wlan1
+
+  # Scan all channels for APs
+  sudo airodump-ng wlan1mon
+
+  # Lock onto specific BSSID and channel for handshake capture
+  sudo airodump-ng --bssid AA:BB:CC:DD:EE:FF -c 6 -w /home/pi/reports/capture wlan1mon
+
+  # Send deauth to force handshake (in a second terminal)
+  sudo aireplay-ng -0 5 -a AA:BB:CC:DD:EE:FF wlan1mon
+
+  # Crack the captured handshake
+  aircrack-ng -w /home/pi/wordlists/rockyou.txt /home/pi/reports/capture-01.cap
+
+  # Restore managed mode
+  sudo airmon-ng stop wlan1mon
+  sudo systemctl restart NetworkManager
+
+  WORDLIST TIPS
+  ──────────────────────────────────────────────────────────────────────────────
+  • rockyou.txt (14 million passwords) — good for generic WiFi passwords
+  • 10k-common.txt — fast first pass, catches most default passwords
+  • Custom wordlist for target: combine company name + common suffixes
+    Example: ClientName2024! ClientName123 ClientName@2024
+  • Use crunch to generate custom wordlists:
+    crunch 8 10 abcdefghijklmnopqrstuvwxyz0123456789 -o custom.txt
+
+  WIFI SECURITY LEVELS (what to report to clients)
+  ──────────────────────────────────────────────────────────────────────────────
+  WEP         → CRITICAL — crackable in seconds regardless of password
+  WPA2 + weak → HIGH     — crackable with rockyou in minutes
+  WPA2 + strong → LOW    — dictionary attack fails, password is strong
+  WPA3        → PASS     — PMKID attack not applicable, recommend maintaining
+  Open (no password) → CRITICAL — immediate deauth and MitM possible
+
+  USB WIFI ADAPTER RECOMMENDATIONS
+  ──────────────────────────────────────────────────────────────────────────────
+  Alfa AWUS036ACH   — dual band, high gain, best for professional use
+  TP-Link TL-WN722N — cheap, reliable, good range, widely supported
+  Panda PAU09       — dual band, good linux driver support
+
+
+================================================================================
+  SECTION 11 — WEB APPLICATION TESTING — TIPS & TRICKS
+================================================================================
+
+  MANUAL COMMANDS (SSH into Pi for more control over sqlmap)
+  ──────────────────────────────────────────────────────────────────────────────
+
+  # Basic sqlmap scan
+  sqlmap -u "http://target.com/page?id=1" --batch
+
+  # Increase aggressiveness (level 3, risk 2)
+  sqlmap -u "http://target.com/page?id=1" --level 3 --risk 2 --batch
+
+  # Target POST form
+  sqlmap -u "http://target.com/login" --data="user=admin&pass=test" --batch
+
+  # Dump entire database
+  sqlmap -u "http://target.com/page?id=1" --dump --batch
+
+  # List databases first
+  sqlmap -u "http://target.com/page?id=1" --dbs --batch
+
+  # Bypass WAF with tamper scripts
+  sqlmap -u "http://target.com/page?id=1" --tamper=space2comment --batch
+
+  # Test all forms on a page
+  sqlmap -u "http://target.com/login" --forms --batch
+
+  # Save output to specific directory
+  sqlmap -u "http://target.com/" --output-dir /home/pi/reports/ --batch
+
+  HEADER ANALYSIS (what curl output tells you)
+  ──────────────────────────────────────────────────────────────────────────────
+
+  MISSING HEADERS = VULNERABILITIES TO REPORT:
+
+  X-Frame-Options: DENY
+    → If missing: clickjacking attack possible
+    → Attacker can embed the site in an iframe and trick users
+
+  Content-Security-Policy: default-src 'self'
+    → If missing: XSS attacks are much easier to execute
+    → No restriction on where scripts can be loaded from
+
+  X-Content-Type-Options: nosniff
+    → If missing: MIME-type sniffing attacks possible
+
+  Strict-Transport-Security: max-age=31536000
+    → If missing: SSL stripping attacks possible
+    → Users connecting on HTTP can be downgraded
+
+  Server: Apache/2.2.14
+    → If present: version disclosure — attacker knows exact CVEs to use
+    → Report as information disclosure, recommend hiding server header
+
+  X-Powered-By: PHP/5.6.0
+    → Same as above — technology stack disclosure
+    → PHP 5.6 is end-of-life — critical finding
+
+  Set-Cookie without Secure or HttpOnly flags
+    → Session tokens can be stolen via XSS or HTTP interception
+
+  COMMON WEB VULNERABILITIES TO INCLUDE IN REPORTS
+  ──────────────────────────────────────────────────────────────────────────────
+  • SQL Injection (SQLi)     — database compromise, data exfiltration
+  • Cross-Site Scripting (XSS) — session hijacking, phishing
+  • Insecure Direct Object Reference (IDOR) — access other users' data
+  • Security Misconfiguration — exposed admin panels, default credentials
+  • Sensitive Data Exposure — passwords in HTML source, API keys in JS
+  • Broken Authentication — weak session tokens, no brute force protection
+  • Directory Listing — web server lists all files in a directory
+
+
+================================================================================
+  SECTION 12 — BRUTE FORCE & CREDENTIAL AUDITING
+================================================================================
+
+  HYDRA COMMANDS (SSH into Pi for more control)
+  ──────────────────────────────────────────────────────────────────────────────
+
+  # SSH brute force
+  hydra -l admin -P /home/pi/wordlists/rockyou.txt 192.168.1.10 ssh
+
+  # FTP brute force
+  hydra -l admin -P /home/pi/wordlists/10k-common.txt 192.168.1.10 ftp
+
+  # HTTP Basic Auth
+  hydra -l admin -P /home/pi/wordlists/10k-common.txt 192.168.1.10 http-get /admin/
+
+  # Web login form (POST)
+  hydra -l admin -P /home/pi/wordlists/rockyou.txt 192.168.1.10 \
+    http-post-form "/login:username=^USER^&password=^PASS^:Invalid credentials"
+
+  # RDP brute force
+  hydra -l administrator -P /home/pi/wordlists/10k-common.txt 192.168.1.10 rdp
+
+  # MySQL brute force
+  hydra -l root -P /home/pi/wordlists/10k-common.txt 192.168.1.10 mysql
+
+  # Telnet brute force
+  hydra -l admin -P /home/pi/wordlists/10k-common.txt 192.168.1.10 telnet
+
+  # Multiple usernames from file
+  hydra -L /home/pi/wordlists/users.txt -P /home/pi/wordlists/rockyou.txt \
+    192.168.1.10 ssh
+
+  # Limit threads to avoid lockout (4 is gentle)
+  hydra -l admin -P wordlist.txt -t 4 192.168.1.10 ssh
+
+  # Stop after first valid credential found
+  hydra -l admin -P wordlist.txt -f 192.168.1.10 ssh
+
+  CREDENTIAL ATTACK STRATEGY
+  ──────────────────────────────────────────────────────────────────────────────
+  Pass 1 — Default credentials (admin/admin, admin/password, root/root)
+    Use 10k-common.txt — fast, catches 90% of misconfigured systems
+
+  Pass 2 — Company-specific wordlist
+    Create wordlist from company name + common patterns:
+    CompanyName1, CompanyName123, CompanyName2024, CompanyName!
+
+  Pass 3 — Full rockyou.txt
+    14 million passwords — catches weak personal-style passwords
+    WARNING: May trigger account lockout — check policy first
+
+  Pass 4 — OSINT-driven wordlist
+    Use theHarvester or LinkedIn to find employee names
+    People often use: FirstName + Birthday, Pet name, Hometown
+
+  DEFAULT CREDENTIALS CHEAT SHEET
+  ──────────────────────────────────────────────────────────────────────────────
+  Router admin panels    : admin/admin, admin/password, admin/(blank)
+  Cisco devices          : cisco/cisco, admin/cisco
+  Fortinet               : admin/(blank)
+  MikroTik               : admin/(blank)
+  Ubiquiti               : ubnt/ubnt
+  VMware ESXi            : root/(blank)
+  Synology NAS           : admin/admin or admin/(blank)
+  QNAP NAS               : admin/admin
+  Jenkins (old)          : admin/admin
+  Tomcat manager         : tomcat/tomcat, admin/admin, admin/s3cret
+  phpMyAdmin             : root/(blank), root/root
+  MySQL default          : root/(blank)
+  MSSQL default          : sa/(blank)
+  MongoDB (old)          : (no auth by default — direct connection)
+  Redis (old)            : (no auth by default — direct connection)
+
+
+================================================================================
+  SECTION 13 — REPORT GENERATION & EVIDENCE COLLECTION
+================================================================================
+
+  AUTOMATIC REPORTS
+  ──────────────────────────────────────────────────────────────────────────────
+  NxtGenAI automatically generates two report formats after every scan:
+
+  JSON Report  : /home/pi/reports/report_{mode}_{timestamp}.json
+    Structure:
+      {
+        "tool":      "PentestGPT-lite",
+        "version":   "1.0.0",
+        "timestamp": "20260314_130000",
+        "mode":      "recon",
+        "results": [
+          {
+            "tool":    "nmap_ping",
+            "command": "nmap -sn 192.168.1.0/24",
+            "rc":      0,
+            "output":  "Nmap scan report...",
+            "risk":    2,
+            "success": true
+          }
+        ]
+      }
+
+  HTML Report  : /home/pi/reports/report_{mode}_{timestamp}.html
+    • Dark Bootstrap 5 theme (fully offline, no CDN)
+    • Colour-coded risk badges (green/amber/red)
+    • Full tool output in pre-formatted code blocks
+    • Raw JSON dump at the bottom for developers
+    • Ready to email to clients immediately
+
+  EXPORTING REPORTS
+  ──────────────────────────────────────────────────────────────────────────────
+  Via Button C (hardware): Hold C on result screen, say "export"
+    → Copies report to first USB drive found at /media/pi/
+
+  Via USB manually:
+    cp /home/pi/reports/*.json /media/pi/DRIVE_NAME/
+    cp /home/pi/reports/*.html /media/pi/DRIVE_NAME/
+
+  Via SSH / SCP (copy to your laptop):
+    scp pi@nxtgenai.local:/home/pi/reports/*.html ./
+    scp pi@nxtgenai.local:/home/pi/reports/*.json ./
+
+  Via rsync (sync all reports):
+    rsync -avz pi@nxtgenai.local:/home/pi/reports/ ./nxtgenai-reports/
+
+  VIEWING LOGS IN REAL TIME
+  ──────────────────────────────────────────────────────────────────────────────
+  sudo journalctl -u pentestgpt -f
+    → Streams live log output from the systemd service
+
+  tail -f /home/pi/reports/pentestgpt.log
+    → Streams the rotating log file directly
+
+  REPORT STORAGE MANAGEMENT
+  ──────────────────────────────────────────────────────────────────────────────
+  Reports are small (typically 5–50 KB each). With a 16 GB SD card you can
+  store thousands of reports. If you need to clear old ones:
+
+  ls -lh /home/pi/reports/            # List all reports with sizes
+  rm /home/pi/reports/report_*.json   # Remove JSON reports
+  rm /home/pi/reports/report_*.html   # Remove HTML reports
+
+
+================================================================================
+  SECTION 14 — WORKFLOW EXAMPLES (START TO FINISH)
+================================================================================
+
+  ── WORKFLOW A: QUICK 15-MINUTE TRIAGE ASSESSMENT ──────────────
+
+  1. SSH into Pi or use OLED buttons
+  2. Hold Button C, say "network scan"      [~3 min] — maps the LAN
+  3. Review OLED for interesting hosts
+  4. Hold Button C, say "web pentest"       [~5 min] — test any web admin panels
+  5. Hold Button C, say "export"            [instant] — save report to USB
+  6. Time spent: ~15 minutes, full evidence report ready
+
+  ── WORKFLOW B: COMPREHENSIVE 2-HOUR ENGAGEMENT ─────────────────
+
+  1. Hold Button C, say "network scan"      [~5 min]  — full host discovery
+  2. SSH in, note all discovered hosts with interesting ports
+  3. Hold Button C, say "web pentest"       [~10 min] — hit all web ports
+  4. Hold Button C, say "wifi crack"        [~20 min] — WPA2 handshake + crack
+  5. SSH in, run hydra manually on SSH/RDP hosts found in step 1 [~30 min]
+  6. Hold Button C, say "full auto"         [~45 min] — AI chains everything
+  7. Hold Button C, say "export"            [instant] — full report to USB
+  8. Total: ~2 hours, comprehensive coverage, professional evidence
+
+  ── WORKFLOW C: OVERNIGHT AUTOMATED ASSESSMENT ──────────────────
+
+  1. Plant Pi on network, SSH in
+  2. sudo systemctl start pentestgpt
+  3. Hold Button C, say "full auto"
+  4. Leave overnight (PiSugar 3 lasts 8–12 hours)
+  5. Return in morning, retrieve device
+  6. Hold Button C, say "export"
+  7. Review reports on laptop via SCP
+
+  ── WORKFLOW D: DEVELOPER SECURITY REVIEW ───────────────────────
+
+  1. Set target URL in config.ini or type via SSH
+  2. Hold Button C, say "web pentest"
+  3. sqlmap runs against the staging/dev environment
+  4. Review HTML report — share with dev team directly
+  5. Developer patches SQLi and header issues
+  6. Repeat test — report confirms fixes are working
+  7. Sign off for production deployment
+
+
+================================================================================
+  SECTION 15 — FIELD DEPLOYMENT TIPS
+================================================================================
+
+  BATTERY LIFE (PiSugar 3)
+  ──────────────────────────────────────────────────────────────────────────────
+  • Full charge to 10% threshold: ~8–12 hours (varies with tool usage)
+  • LLM inference spikes power draw — Full Auto mode uses more battery
+  • OLED dims automatically below 20% to extend battery life
+  • Safe shutdown triggered at 10% — report is saved first
+  • Always charge fully before an engagement (USB-C, standard 5V 3A charger)
+  • Check battery via SSH: python3 -c "import smbus2; b=smbus2.SMBus(1); print(b.read_byte_data(0x57, 0x2A), '%')"
+
+  STEALTH CONSIDERATIONS
+  ──────────────────────────────────────────────────────────────────────────────
+  • Pi Zero 2 W is smaller than a credit card — easily concealable
+  • PiSugar 3 + Pi stack is about the size of a matchbox
+  • Can fit inside: fake power adapters, conference room clocks, notebooks
+  • OLED brightness can be turned down to 0 for fully dark operation
+  • espeak-ng volume can be set to 0 in config.ini for silent operation
+  • SSH access means you never need to physically touch it once planted
+  • Systemd auto-start means it begins scanning after every reboot automatically
+
+  CONNECTIVITY OPTIONS
+  ──────────────────────────────────────────────────────────────────────────────
+  Option 1: Connect Pi to client WiFi (needs credentials pre-configured)
+    → Edit /etc/wpa_supplicant/wpa_supplicant.conf before deployment
+
+  Option 2: Connect Pi via ethernet (more reliable, harder to detect)
+    → Use USB-A to ethernet adapter on the Pi Zero's USB port
+
+  Option 3: Pi creates its own hotspot, you connect your laptop to it
+    → Useful when you can't get on client network but have physical access
+    → sudo nmcli device wifi hotspot ssid MyHotspot password MyPassword
+
+  Option 4: 4G USB dongle for fully independent operation
+    → Pi runs on mobile data — completely independent of client network
+    → SSH in over 4G from anywhere
+
+  PHYSICAL ACCESS TIPS
+  ──────────────────────────────────────────────────────────────────────────────
+  • Ethernet ports in meeting rooms are often active and trusted
+  • Look behind TVs, under desks, in server room corners
+  • Conference room AV equipment closets often have active ethernet
+  • Reception desk areas often have open ethernet ports
+  • Parking garages / loading docks often have forgotten ethernet runs
+  • Tape the Pi behind a power strip — looks like a WiFi extender
+
+  PRE-ENGAGEMENT CHECKLIST
+  ──────────────────────────────────────────────────────────────────────────────
+  [ ] Written authorisation from client signed and in hand
+  [ ] Pi charged to 100%
+  [ ] Vosk model downloaded and tested
+  [ ] TinyLlama model downloaded and tested
+  [ ] rockyou.txt present at correct path
+  [ ] config.ini updated with correct WiFi interface (wlan0 or wlan1)
+  [ ] config.ini max_risk_score set to 10 for professional use
+  [ ] SSH access confirmed working before arrival
+  [ ] USB drive plugged in for report export
+  [ ] Simulate a test run at home on your own network first
+
+
+================================================================================
+  SECTION 16 — TROUBLESHOOTING
+================================================================================
+
+  PROBLEM: OLED not showing anything
+  ──────────────────────────────────────────────────────────────────────────────
+  Check: i2cdetect -y 1
+  Should show 0x3C. If blank: check I2C is enabled in raspi-config.
+  Try: sudo raspi-config → Interface Options → I2C → Enable
+
+  PROBLEM: "AI core unavailable — tool-only mode"
+  ──────────────────────────────────────────────────────────────────────────────
+  The LLM model file is missing or corrupt.
+  Check: ls -lh /home/pi/models/tinyllama-1.1b-q4_0.gguf
+  Should be ~620 MB. If missing, re-run: sudo ./setup.sh
+
+  PROBLEM: "Voice input unavailable — Button C will act as SELECT"
+  ──────────────────────────────────────────────────────────────────────────────
+  Either vosk, pyaudio, or the Vosk model is missing.
+  Check: ls /home/pi/models/vosk-model-small-en-us/
+  If missing: wget https://alphacephei.com/vosk/models/vosk-model-small-en-us-0.15.zip
+              unzip vosk-model-small-en-us-0.15.zip -d /home/pi/models/
+
+  PROBLEM: WiFi crack fails at airmon-ng
+  ──────────────────────────────────────────────────────────────────────────────
+  Built-in wlan0 does not support monitor mode on Pi Zero 2 W.
+  You MUST use a USB WiFi adapter with a monitor-mode capable chipset.
+  Recommended: Alfa AWUS036ACH (rtl8812au chipset)
+  After plugging in: change config.ini [wifi] interface = wlan1
+
+  PROBLEM: nmap says "Failed to open device wlan0" or permission error
+  ──────────────────────────────────────────────────────────────────────────────
+  nmap SYN scan requires root. The systemd service runs as pi.
+  Fix: sudo nmap ... or run the service as root:
+  Edit /etc/systemd/system/pentestgpt.service → User=root
+  Then: sudo systemctl daemon-reload && sudo systemctl restart pentestgpt
+
+  PROBLEM: hydra says "Wordlist not found"
+  ──────────────────────────────────────────────────────────────────────────────
+  Check: ls -lh /home/pi/wordlists/
+  If rockyou.txt missing: sudo apt install wordlists
+  Then: gunzip -c /usr/share/wordlists/rockyou.txt.gz > /home/pi/wordlists/rockyou.txt
+
+  PROBLEM: System runs out of memory during LLM load
+  ──────────────────────────────────────────────────────────────────────────────
+  Check: free -m   (should have at least 150 MB free before LLM loads)
+  Increase swap: sudo dphys-swapfile swapoff
+                 sudo sed -i 's/CONF_SWAPSIZE=.*/CONF_SWAPSIZE=256/' /etc/dphys-swapfile
+                 sudo dphys-swapfile setup && sudo dphys-swapfile swapon
+
+  PROBLEM: PiSugar 3 battery not detected (always shows 100%)
+  ──────────────────────────────────────────────────────────────────────────────
+  Check I2C: i2cdetect -y 1 (should show 0x57)
+  Ensure PiSugar is properly seated on the Pi GPIO header.
+  Check smbus2 is installed: pip show smbus2
+
+  PROBLEM: espeak-ng not producing audio
+  ──────────────────────────────────────────────────────────────────────────────
+  Check speaker is connected to 3.5mm jack or USB.
+  Test: espeak-ng "hello"
+  Force audio to 3.5mm jack: sudo raspi-config → System Options → Audio → Headphones
+  Check volume: alsamixer (set PCM to 100)
+
+  PROBLEM: Service won't start — "Unit pentestgpt.service failed"
+  ──────────────────────────────────────────────────────────────────────────────
+  Check logs: sudo journalctl -u pentestgpt -n 50 --no-pager
+  Most common causes:
+    1. Python venv not found — re-run setup.sh
+    2. main.py has a syntax error — run: python3 /home/pi/NxtGenAI/main.py
+    3. Reports directory doesn't exist — run: mkdir -p /home/pi/reports
+
+  USEFUL DIAGNOSTIC COMMANDS
+  ──────────────────────────────────────────────────────────────────────────────
+  # Check all I2C devices
+  i2cdetect -y 1
+
+  # Check service status
+  sudo systemctl status pentestgpt
+
+  # View last 50 log lines
+  sudo journalctl -u pentestgpt -n 50 --no-pager
+
+  # Check RAM usage
+  free -m
+
+  # Check disk usage
+  df -h
+
+  # Check CPU temperature (throttles above 80°C)
+  vcgencmd measure_temp
+
+  # Check battery manually
+  python3 -c "import smbus2; b=smbus2.SMBus(1); print('Battery:', b.read_byte_data(0x57, 0x2A), '%')"
+
+  # Test espeak-ng
+  espeak-ng "NxtGenAI ready for deployment"
+
+  # Test vosk recognition
+  cd /home/pi/NxtGenAI && source /home/pi/pentestgpt-venv/bin/activate
+  python3 -c "import vosk; print('Vosk OK'); import pyaudio; print('PyAudio OK')"
+
+  # Run simulation test (validates all modules without hardware)
+  python3 /home/pi/NxtGenAI/simulate.py
+
+
+================================================================================
+  END OF TIP SHEET
+  NxtGenAI — Professional Penetration Testing Toolkit
+  MIT License — For authorised use only.
+  Always obtain written permission before testing any system you do not own.
+================================================================================
