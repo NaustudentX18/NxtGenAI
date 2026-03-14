@@ -1,11 +1,11 @@
-# 🛡️ PentestGPT-lite — AI-Powered Offline Pentesting Toolkit
+# 🛡️ NxtGenAI — AI-Powered Offline Pentesting Toolkit
 
 <!--
 MIT License — Copyright (c) 2026 DINA OKTARIANA
 See LICENSE file for full text.
 -->
 
-> **"A £500 gadget in your pocket, offline forever."**
+> **"A pocket-sized AI pentester, offline forever."**
 > Powered by TinyLlama on Raspberry Pi Zero 2 W — no cloud, no leaks, full autonomy.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
@@ -20,7 +20,7 @@ See LICENSE file for full text.
 ```
 ┌──────────────────────────┐
 │  ██████████████████████  │  ← 128×64 OLED (SSD1306)
-│  ██  PentestGPT-lite  ██  │
+│  ██    NxtGenAI        ██  │
 │  ██  [WiFi Crack     ] ██  │  ← Button A cycles mode
 │  ██  [Web Pentest    ] ██  │
 │  ██  [Network Recon  ] ██  │
@@ -28,7 +28,7 @@ See LICENSE file for full text.
 │  ██  Batt: 87% ■■■■░  ██  │  ← PiSugar 3 live readout
 │  ██████████████████████  │
 └──────────────────────────┘
-  [A] Run   [B] Back   [C] Report
+  [A] Next   [B] Back   [C] Push-to-Talk
 ```
 
 ---
@@ -39,7 +39,7 @@ See LICENSE file for full text.
 |---|---|---|
 | SBC | Raspberry Pi Zero 2 W | ARMv8, 512 MB RAM |
 | Battery HAT | PiSugar 3 | I2C power monitor, USB-C charge |
-| Display HAT | Waveshare Play Hat | SSD1306 128×64 OLED, 3 buttons |
+| Display / Input HAT | Whisplay Pi AI Hat | SSD1306 128×64 OLED, 3 buttons (A/B/C) |
 | Storage | microSD ≥ 8 GB | Class 10 / A1 recommended |
 | OS | Raspberry Pi OS Lite (Bookworm) | 64-bit, headless |
 
@@ -62,7 +62,7 @@ sudo reboot
 ```
 
 > **First Boot:** OLED shows animated splash, voice says  
-> *"Welcome to PentestGPT-lite. Press button A to cycle modes, button B to go back. Hold button C to speak a voice command."*
+> *"Welcome to NxtGenAI. Press button A to cycle modes, button B to go back. Hold button C to speak a voice command."*
 
 ---
 

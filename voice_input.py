@@ -19,7 +19,7 @@
 #   If vosk or pyaudio are not installed the class still instantiates and
 #   all methods return None / False — the rest of the app is unaffected.
 #
-# GPIO mapping (Waveshare Play Hat, BCM):
+# GPIO mapping (Whisplay Pi AI Hat, BCM):
 #   Button C (GPIO 16) — Push-to-Talk  (hold = record, release = recognise)
 # =============================================================================
 
