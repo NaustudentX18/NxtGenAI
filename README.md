@@ -39,7 +39,7 @@ See LICENSE file for full text.
 |---|---|---|
 | SBC | Raspberry Pi Zero 2 W | ARMv8, 512 MB RAM |
 | Battery HAT | PiSugar 3 | I2C power monitor, USB-C charge |
-| Display HAT | Waveshare Play Hat | SSD1306 128×64 OLED, 3 buttons |
+| Display HAT | Whisplay Pi AI Hat | SSD1306 128×64 OLED, 3 buttons |
 | Storage | microSD ≥ 8 GB | Class 10 / A1 recommended |
 | OS | Raspberry Pi OS Lite (Bookworm) | 64-bit, headless |
 

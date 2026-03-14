@@ -6,11 +6,11 @@
 #
 # Manages:
 #   - SSD1306 128×64 OLED via I2C (adafruit-circuitpython-ssd1306)
-#   - Button inputs: A (GPIO 21), B (GPIO 20), C (GPIO 16) — Waveshare Play Hat
+#   - Button inputs: A (GPIO 21), B (GPIO 20), C (GPIO 16) — Whisplay Pi AI Hat
 #   - All draw calls are double-buffered (<1 s refresh, non-blocking)
 #   - Animations: frame-by-frame splash, progress bar, scrolling text
 #
-# GPIO assignments (Waveshare Play Hat, BCM numbering):
+# GPIO assignments (Whisplay Pi AI Hat, BCM numbering):
 #   Button A  → GPIO 21   (Next / cycle menu item)
 #   Button B  → GPIO 20   (Back / previous item)
 #   Button C  → GPIO 16   (Push-to-Talk — hold to speak, release to send)
@@ -47,7 +47,7 @@ except ImportError:
 
 
 # =============================================================================
-# GPIO pin assignments (BCM numbering — Waveshare Play Hat)
+# GPIO pin assignments (BCM numbering — Whisplay Pi AI Hat)
 # Joystick has been removed. Only the three physical buttons are used.
 # =============================================================================
 PIN_BTN_A = 21   # Button A — Next / cycle menu item
@@ -63,7 +63,7 @@ _PRESS_PINS: dict[int, str] = {
 # All input pins — used for GPIO.setup
 _ALL_INPUT_PINS = [PIN_BTN_A, PIN_BTN_B, PIN_BTN_C]
 
-# Display dimensions (SSD1306 on Waveshare Play Hat)
+# Display dimensions (SSD1306 on Whisplay Pi AI Hat)
 OLED_WIDTH  = 128
 OLED_HEIGHT = 64
 
