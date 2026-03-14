@@ -22,7 +22,7 @@
 #   - tool_thread  : Pentest tool subprocess wrapper (daemon)
 #   - ptt_thread   : Push-to-talk audio capture (daemon, started per press)
 #
-# Button layout (Waveshare Play Hat — joystick removed):
+# Button layout (Whisplay Pi AI Hat — joystick removed):
 #   Button A (GPIO 21) — Next / cycle menu item + announces it aloud
 #   Button B (GPIO 20) — Back / previous menu item
 #   Button C (GPIO 16) — Push-to-Talk walkie-talkie (hold=record, release=act)
