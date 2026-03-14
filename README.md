@@ -13,6 +13,8 @@ See LICENSE file for full text.
 [![Python](https://img.shields.io/badge/python-3.11%2B-blue)](https://www.python.org/)
 [![Offline](https://img.shields.io/badge/internet-NOT%20required-brightgreen)](#)
 
+📚 **Documentation:** [Contributing](CONTRIBUTING.md) · [Changelog](CHANGELOG.md) · [Security Policy](SECURITY.md) · [Troubleshooting](docs/troubleshooting.md) · [Development Guide](docs/development.md)
+
 ---
 
 ## 📸 Screenshots (Hardware Preview)
@@ -124,6 +126,12 @@ NxtGenAI/
 ├── config.ini        # Paths, thresholds, model config
 ├── requirements.txt  # Minimal Python dependencies
 ├── README.md         # This file
+├── CONTRIBUTING.md   # Contributor guidelines
+├── CHANGELOG.md      # Version history
+├── SECURITY.md       # Security policy & responsible disclosure
+├── docs/
+│   ├── troubleshooting.md  # Common issues and fixes
+│   └── development.md      # Developing without physical hardware
 └── LICENSE           # MIT
 ```
 
@@ -177,7 +185,13 @@ The authors accept no liability for misuse. See [LICENSE](LICENSE).
 
 ## 🤝 Contributing
 
-PRs welcome! Please follow PEP 8 and include comments explaining any non-obvious logic.
+PRs welcome! Please read [CONTRIBUTING.md](CONTRIBUTING.md) for code style guidelines, the PR process, and a manual testing checklist.
+
+For development without a Raspberry Pi, see [docs/development.md](docs/development.md).
+
+If you encounter problems, check [docs/troubleshooting.md](docs/troubleshooting.md) for common fixes.
+
+To report a security vulnerability, please follow the [Security Policy](SECURITY.md) — **do not open a public issue**.
 
 ---
 
