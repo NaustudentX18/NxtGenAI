@@ -30,6 +30,7 @@
 
 import configparser
 import logging
+import logging.handlers
 import os
 import signal
 import subprocess
@@ -48,6 +49,9 @@ from voice_input import VoiceInput  # Push-to-talk offline STT
 # =============================================================================
 # Logging setup
 # =============================================================================
+_LOG_DIR = "/home/pi/reports"
+os.makedirs(_LOG_DIR, exist_ok=True)
+
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
@@ -55,16 +59,13 @@ logging.basicConfig(
         logging.StreamHandler(sys.stdout),
         # Rotate log file so it never fills the SD card
         logging.handlers.RotatingFileHandler(
-            "/home/pi/reports/pentestgpt.log",
+            os.path.join(_LOG_DIR, "pentestgpt.log"),
             maxBytes=1_048_576,  # 1 MB
             backupCount=2,
         ),
     ],
 )
 log = logging.getLogger("main")
-
-# Add RotatingFileHandler (import at top would fail if logging not configured)
-import logging.handlers  # noqa: E402 — placed after basicConfig intentionally
 
 
 # =============================================================================

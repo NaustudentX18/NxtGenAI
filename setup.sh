@@ -48,6 +48,15 @@ info "Detected architecture: ${ARCH}"
 [[ "$ARCH" =~ ^(aarch64|armv8|armv7l)$ ]] || \
     warn "Unexpected architecture ${ARCH} — designed for Raspberry Pi ARMv8"
 
+# ── Check Python version (3.10+ required for PEP 604 union syntax) ────────────
+PY_VER=$(python3 -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')" 2>/dev/null || echo "0.0")
+PY_MAJOR=$(echo "$PY_VER" | cut -d. -f1)
+PY_MINOR=$(echo "$PY_VER" | cut -d. -f2)
+if [[ "$PY_MAJOR" -lt 3 || ( "$PY_MAJOR" -eq 3 && "$PY_MINOR" -lt 10 ) ]]; then
+    error "Python 3.10+ is required (found Python ${PY_VER}). Please upgrade and re-run."
+fi
+info "Python ${PY_VER} — OK"
+
 # =============================================================================
 # STEP 1 — System package update
 # =============================================================================
@@ -67,7 +76,7 @@ PACKAGES=(
     # Desktop GUI (Tkinter — required for python3 gui.py)
     python3-tk
     # Pentest tools
-    nmap hydra aircrack-ng aireplay-ng sqlmap
+    nmap hydra aircrack-ng sqlmap
     # Voice output
     espeak-ng
     # Voice input — PyAudio requires PortAudio development headers
@@ -120,6 +129,8 @@ usermod -aG i2c,spi pi 2>/dev/null || true
 modprobe i2c-dev 2>/dev/null || true
 
 success "I2C and SPI configured."
+warn "A reboot is required for I2C/SPI changes to fully take effect."
+warn "The installer will continue, but please reboot after setup completes."
 
 # =============================================================================
 # STEP 4 — Create directory structure
@@ -380,4 +391,7 @@ echo -e "${CYAN}└────────────────────�
 echo ""
 warn "LEGAL NOTICE: Use only on networks/systems you own or have"
 warn "explicit written authorisation to test. Misuse is illegal."
+echo ""
+warn "⚠️  REBOOT REQUIRED: I2C/SPI changes take effect after a reboot."
+warn "   Run: sudo reboot"
 echo ""
