@@ -1,5 +1,5 @@
 # =============================================================================
-# PentestGPT-lite — Python Dependencies
+# NxtGenAI — Python Dependencies
 # =============================================================================
 # MIT License — Copyright (c) 2026 DINA OKTARIANA
 #

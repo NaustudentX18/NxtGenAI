@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # =============================================================================
-# PentestGPT-lite — One-Command Installer
+# NxtGenAI — One-Command Installer
 # =============================================================================
 # MIT License — Copyright (c) 2026 DINA OKTARIANA
 #
@@ -140,7 +140,7 @@ success "Directories created."
 # =============================================================================
 info "Step 5/8 — Setting up Python virtual environment..."
 
-VENV="/home/pi/pentestgpt-venv"
+VENV="/home/pi/nxtgenai-venv"
 
 if [[ ! -d "$VENV" ]]; then
     python3 -m venv "$VENV"
@@ -306,17 +306,17 @@ else
 fi
 
 # Update systemd service for auto-start on boot (OLED headless mode)
-SERVICE_FILE="/etc/systemd/system/pentestgpt.service"
+SERVICE_FILE="/etc/systemd/system/nxtgenai.service"
 cat > "$SERVICE_FILE" <<EOF
 [Unit]
-Description=PentestGPT-lite Autonomous Pentesting Toolkit
+Description=NxtGenAI Autonomous Pentesting Toolkit
 After=multi-user.target
 
 [Service]
 Type=simple
 User=pi
 WorkingDirectory=/home/pi/NxtGenAI
-ExecStart=/home/pi/pentestgpt-venv/bin/python3 /home/pi/NxtGenAI/main.py
+ExecStart=/home/pi/nxtgenai-venv/bin/python3 /home/pi/NxtGenAI/main.py
 Restart=on-failure
 RestartSec=5
 StandardOutput=journal
@@ -327,15 +327,15 @@ WantedBy=multi-user.target
 EOF
 
 systemctl daemon-reload
-systemctl enable pentestgpt.service
-success "  systemd service enabled (pentestgpt.service)"
+systemctl enable nxtgenai.service
+success "  systemd service enabled (nxtgenai.service)"
 
 # =============================================================================
 # DONE
 # =============================================================================
 echo ""
 echo -e "${GREEN}══════════════════════════════════════════════${NC}"
-echo -e "${GREEN}  PentestGPT-lite installation complete!      ${NC}"
+echo -e "${GREEN}  NxtGenAI installation complete!             ${NC}"
 echo -e "${GREEN}══════════════════════════════════════════════${NC}"
 echo ""
 echo -e "${CYAN}┌─────────────────────────────────────────────────────────────────┐${NC}"
@@ -345,11 +345,11 @@ echo -e "${CYAN}│  🖥️   Desktop GUI (recommended for beginners):         
 echo -e "${CYAN}│       python3 /home/pi/NxtGenAI/gui.py                          │${NC}"
 echo -e "${CYAN}│                                                                  │${NC}"
 echo -e "${CYAN}│  📺  OLED headless (Raspberry Pi hardware):                     │${NC}"
-echo -e "${CYAN}│       sudo systemctl start pentestgpt                           │${NC}"
+echo -e "${CYAN}│       sudo systemctl start nxtgenai                             │${NC}"
 echo -e "${CYAN}│       sudo python3 /home/pi/NxtGenAI/main.py                   │${NC}"
 echo -e "${CYAN}│                                                                  │${NC}"
 echo -e "${CYAN}│  🔄  Auto-start on boot (OLED mode):                            │${NC}"
-echo -e "${CYAN}│       sudo systemctl enable pentestgpt                          │${NC}"
+echo -e "${CYAN}│       sudo systemctl enable nxtgenai                            │${NC}"
 echo -e "${CYAN}│       sudo reboot                                                │${NC}"
 echo -e "${CYAN}├─────────────────────────────────────────────────────────────────┤${NC}"
 echo -e "${CYAN}│  🎙️   VOICE COMMANDS (say these into the microphone):           │${NC}"
@@ -373,7 +373,7 @@ echo -e "${CYAN}│       Button B — Previous item / back                     
 echo -e "${CYAN}│       Button C — Push-to-Talk voice input                       │${NC}"
 echo -e "${CYAN}├─────────────────────────────────────────────────────────────────┤${NC}"
 echo -e "${CYAN}│  📋  USEFUL COMMANDS:                                           │${NC}"
-echo -e "${CYAN}│       View logs:   sudo journalctl -u pentestgpt -f             │${NC}"
+echo -e "${CYAN}│       View logs:   sudo journalctl -u nxtgenai -f               │${NC}"
 echo -e "${CYAN}│       Edit config: nano /home/pi/NxtGenAI/config.ini            │${NC}"
 echo -e "${CYAN}│       Reports:     ls /home/pi/reports/                         │${NC}"
 echo -e "${CYAN}└─────────────────────────────────────────────────────────────────┘${NC}"

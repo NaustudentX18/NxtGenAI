@@ -4,7 +4,7 @@
 # =============================================================================
 # MIT License — Copyright (c) 2026 DINA OKTARIANA
 #
-# A rich Tkinter desktop GUI that wraps the PentestGPT-lite engine.
+# A rich Tkinter desktop GUI that wraps the NxtGenAI engine.
 # Run with:
 #   python3 gui.py              # auto-loads config.ini from same directory
 #   python3 gui.py --config /path/to/config.ini
@@ -723,7 +723,7 @@ class FaceCanvas(tk.Canvas):
 # =============================================================================
 class BuddyGUI:
     """
-    Top-level desktop GUI for NxtGenAI / PentestGPT-lite.
+    Top-level desktop GUI for NxtGenAI.
 
     Shows a character selection screen on first run, then the main
     mission-control interface with an animated pentest buddy.

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # =============================================================================
-# PentestGPT-lite — Power Management (PiSugar 3)
+# NxtGenAI — Power Management (PiSugar 3)
 # =============================================================================
 # MIT License — Copyright (c) 2026 DINA OKTARIANA
 #
