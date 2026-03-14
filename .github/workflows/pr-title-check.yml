@@ -1,0 +1,24 @@
+name: PR Title Check
+
+on:
+  pull_request:
+    types: [opened, edited, reopened, synchronize]
+
+jobs:
+  check-title:
+    name: No WIP marker in PR title
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Check for [WIP] in PR title
+        env:
+          PR_TITLE: ${{ github.event.pull_request.title }}
+        run: |
+          if echo "$PR_TITLE" | grep -qiF '[WIP]'; then
+            echo "❌ PR title contains '[WIP]': $PR_TITLE"
+            echo "Please remove the '[WIP]' marker when the work is ready for review."
+            exit 1
+          fi
+          echo "✅ PR title is clear of WIP markers: $PR_TITLE"
