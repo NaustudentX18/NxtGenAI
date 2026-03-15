@@ -291,6 +291,8 @@ class OLEDDisplay:
 
     def _splash_frame_1(self) -> None:
         """Frame 1: corners only."""
+        if self._draw is None:
+            return
         self._draw.rectangle((0, 0, 3, 3), fill=1)
         self._draw.rectangle((OLED_WIDTH - 4, 0, OLED_WIDTH - 1, 3), fill=1)
         self._draw.rectangle((0, OLED_HEIGHT - 4, 3, OLED_HEIGHT - 1), fill=1)
@@ -299,17 +301,23 @@ class OLEDDisplay:
 
     def _splash_frame_2(self) -> None:
         """Frame 2: full border."""
+        if self._draw is None:
+            return
         self._draw.rectangle((0, 0, OLED_WIDTH - 1, OLED_HEIGHT - 1),
                               outline=1, fill=0)
 
     def _splash_frame_3(self) -> None:
         """Frame 3: border + title."""
+        if self._draw is None:
+            return
         self._draw.rectangle((0, 0, OLED_WIDTH - 1, OLED_HEIGHT - 1),
                               outline=1, fill=0)
         self._text(14, 18, "PentestGPT-lite")
 
     def _splash_frame_4(self) -> None:
         """Frame 4: border + title + tagline + shield icon."""
+        if self._draw is None:
+            return
         self._draw.rectangle((0, 0, OLED_WIDTH - 1, OLED_HEIGHT - 1),
                               outline=1, fill=0)
         self._text(14, 16, "PentestGPT-lite")
