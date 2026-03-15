@@ -251,7 +251,7 @@ class OLEDDisplay:
 
     def clear(self) -> None:
         """Clear display to black."""
-        if self._draw is None:
+        if not _PIL_AVAILABLE:
             return
         with self._lock:
             self._clear_buf()
@@ -276,7 +276,7 @@ class OLEDDisplay:
         Frame 1: blank → Frame 2: border → Frame 3: title → Frame 4: tagline
         Each frame shown for ~200 ms to achieve smooth 5 fps animation.
         """
-        if self._draw is None:
+        if not _PIL_AVAILABLE:
             return
         frames = [
             self._splash_frame_1,
@@ -335,7 +335,7 @@ class OLEDDisplay:
         Show a loading screen with animated progress dots.
         Called every 200 ms during LLM init — non-blocking.
         """
-        if self._draw is None:
+        if not _PIL_AVAILABLE:
             return
         # Animate a spinner: cycle through |/-\ characters
         t    = int(time.monotonic() * 4) % 4
@@ -364,7 +364,7 @@ class OLEDDisplay:
         Selected item is inverted (black text on white background).
         Battery % shown in bottom-right corner.
         """
-        if self._draw is None:
+        if not _PIL_AVAILABLE:
             return
         with self._lock:
             self._clear_buf()
@@ -399,7 +399,7 @@ class OLEDDisplay:
     # ── Status / message screen ───────────────────────────────────────────────
     def show_message(self, title: str, body: str) -> None:
         """Display a two-line status screen (title + body)."""
-        if self._draw is None:
+        if not _PIL_AVAILABLE:
             return
         with self._lock:
             self._clear_buf()
@@ -417,7 +417,7 @@ class OLEDDisplay:
           4–6 → bordered box (caution)
           7–10 → inverted (danger)
         """
-        if self._draw is None:
+        if not _PIL_AVAILABLE:
             return
         with self._lock:
             self._clear_buf()
@@ -450,7 +450,7 @@ class OLEDDisplay:
         Display a scrollable text view.
         Shows up to 4 lines with a scroll indicator on the right edge.
         """
-        if self._draw is None:
+        if not _PIL_AVAILABLE:
             return
         with self._lock:
             self._clear_buf()
@@ -478,7 +478,7 @@ class OLEDDisplay:
         Display the PTT 'Listening...' indicator while Button C is held.
         Shown immediately on C_PRESS so the user knows the mic is live.
         """
-        if self._draw is None:
+        if not _PIL_AVAILABLE:
             return
         with self._lock:
             self._clear_buf()
