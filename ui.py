@@ -274,6 +274,8 @@ class OLEDDisplay:
         Frame 1: blank → Frame 2: border → Frame 3: title → Frame 4: tagline
         Each frame shown for ~200 ms to achieve smooth 5 fps animation.
         """
+        if not _PIL_AVAILABLE:
+            return
         frames = [
             self._splash_frame_1,
             self._splash_frame_2,
@@ -323,6 +325,8 @@ class OLEDDisplay:
         Show a loading screen with animated progress dots.
         Called every 200 ms during LLM init — non-blocking.
         """
+        if not _PIL_AVAILABLE:
+            return
         # Animate a spinner: cycle through |/-\ characters
         t    = int(time.monotonic() * 4) % 4
         spin = r"|/-\\"[t]
@@ -350,6 +354,8 @@ class OLEDDisplay:
         Selected item is inverted (black text on white background).
         Battery % shown in bottom-right corner.
         """
+        if not _PIL_AVAILABLE:
+            return
         with self._lock:
             self._clear_buf()
             # Title bar
@@ -383,6 +389,8 @@ class OLEDDisplay:
     # ── Status / message screen ───────────────────────────────────────────────
     def show_message(self, title: str, body: str) -> None:
         """Display a two-line status screen (title + body)."""
+        if not _PIL_AVAILABLE:
+            return
         with self._lock:
             self._clear_buf()
             self._draw.rectangle((0, 0, OLED_WIDTH - 1, 10), fill=1)
@@ -399,6 +407,8 @@ class OLEDDisplay:
           4–6 → bordered box (caution)
           7–10 → inverted (danger)
         """
+        if not _PIL_AVAILABLE:
+            return
         with self._lock:
             self._clear_buf()
             # Header
@@ -430,6 +440,8 @@ class OLEDDisplay:
         Display a scrollable text view.
         Shows up to 4 lines with a scroll indicator on the right edge.
         """
+        if not _PIL_AVAILABLE:
+            return
         with self._lock:
             self._clear_buf()
             # Header
@@ -456,6 +468,8 @@ class OLEDDisplay:
         Display the PTT 'Listening...' indicator while Button C is held.
         Shown immediately on C_PRESS so the user knows the mic is live.
         """
+        if not _PIL_AVAILABLE:
+            return
         with self._lock:
             self._clear_buf()
             self._draw.rectangle((0, 0, OLED_WIDTH - 1, OLED_HEIGHT - 1),
