@@ -228,7 +228,7 @@ check("import main", _import_main)
 # ─────────────────────────────────────────────────────────────────────────────
 print("\n[2/7] Config loading")
 # ─────────────────────────────────────────────────────────────────────────────
-cfg = configparser.ConfigParser()
+cfg = configparser.ConfigParser(inline_comment_prefixes=("#", ";"))
 cfg_path = os.path.join(os.path.dirname(__file__), "config.ini")
 
 def _cfg_exists():
