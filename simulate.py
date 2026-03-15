@@ -132,7 +132,6 @@ sys.modules["pyaudio"] = _pa_mod
 # ── nmap / hydra / aircrack stubs via subprocess mock ─────────────────────────
 # We'll patch subprocess.Popen in tools._run to return canned output
 import subprocess as _subprocess_real
-_OrigPopen = _subprocess_real.Popen
 
 TOOL_OUTPUTS = {
     "nmap":        "Nmap scan report for 192.168.1.1\nHost is up.\nPORT   STATE SERVICE\n22/tcp open  ssh",
