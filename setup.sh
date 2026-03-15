@@ -10,12 +10,13 @@
 # What this does:
 #   1. Updates system packages
 #   2. Installs system dependencies (nmap, hydra, aircrack-ng, espeak-ng, etc.)
-#   3. Enables I2C and SPI via raspi-config (required for OLED + PiSugar)
-#   4. Creates Python virtual environment and installs pip packages
-#   5. Downloads TinyLlama-1.1B-Q4_0 GGUF model if not present
-#   6. Creates necessary directories
-#   7. Configures systemd service for auto-start on boot
-#   8. Sets up swap (64 MB) to handle LLM memory spikes
+#   3. Installs Whisplay Pi AI Hat drivers (WM8960 audio, LCD, buttons, LED)
+#   4. Enables I2C and SPI via raspi-config (required for OLED + PiSugar)
+#   5. Creates Python virtual environment and installs pip packages
+#   6. Downloads TinyLlama-1.1B-Q4_0 GGUF model if not present
+#   7. Creates necessary directories
+#   8. Configures systemd service for auto-start on boot
+#   9. Sets up swap (256 MB) to handle LLM memory spikes
 #
 # RAM Budget (tested with `free -m` after full startup):
 #   TinyLlama Q4_0 inference : ~180 MB
@@ -51,7 +52,7 @@ info "Detected architecture: ${ARCH}"
 # =============================================================================
 # STEP 1 — System package update
 # =============================================================================
-info "Step 1/8 — Updating system packages..."
+info "Step 1/9 — Updating system packages..."
 apt-get update -qq
 apt-get upgrade -y -qq
 success "System packages updated."
@@ -59,23 +60,27 @@ success "System packages updated."
 # =============================================================================
 # STEP 2 — Install system dependencies
 # =============================================================================
-info "Step 2/8 — Installing system dependencies..."
+info "Step 2/9 — Installing system dependencies..."
 
 PACKAGES=(
     # Core tooling
     python3 python3-pip python3-venv python3-dev
     # Desktop GUI (Tkinter — required for python3 gui.py)
     python3-tk
+    # Whisplay HAT Python dependencies (display, GPIO, audio)
+    python3-libgpiod python3-spidev python3-pil python3-pygame
     # Pentest tools
-    nmap hydra aircrack-ng aireplay-ng sqlmap
+    nmap hydra aircrack-ng sqlmap
     # Voice output
     espeak-ng
     # Voice input — PyAudio requires PortAudio development headers
     portaudio19-dev
+    # Audio utilities (ALSA — needed for WM8960 soundcard verification)
+    alsa-utils
     # I2C / SPI / GPIO
     python3-smbus i2c-tools
     # Misc
-    git curl wget usbutils
+    git curl wget unzip usbutils
     # Build tools (needed for llama-cpp-python compilation)
     build-essential cmake
 )
@@ -91,9 +96,54 @@ done
 success "System dependencies installed."
 
 # =============================================================================
-# STEP 3 — Enable I2C and SPI
+# STEP 3 — Install Whisplay Pi AI Hat drivers
 # =============================================================================
-info "Step 3/8 — Enabling I2C and SPI interfaces..."
+info "Step 3/9 — Installing Whisplay Pi AI Hat drivers (WM8960 audio + LCD + buttons + LED)..."
+
+WHISPLAY_DIR="/opt/Whisplay"
+
+if [[ -d "$WHISPLAY_DIR" ]]; then
+    info "  Whisplay repo already cloned — pulling latest..."
+    git -C "$WHISPLAY_DIR" pull --quiet
+else
+    info "  Cloning PiSugar/Whisplay driver repo..."
+    git clone https://github.com/PiSugar/Whisplay.git --depth 1 "$WHISPLAY_DIR"
+    success "  Whisplay repo cloned to $WHISPLAY_DIR"
+fi
+
+# Run the official Raspberry Pi WM8960 driver installer
+# This installs the ALSA overlay, configures /boot/firmware/config.txt,
+# and sets up the wm8960-soundcard so PyAudio can open the mic/speaker.
+WHISPLAY_DRIVER_SCRIPT="$WHISPLAY_DIR/Driver/install_wm8960_drive.sh"
+if [[ -f "$WHISPLAY_DRIVER_SCRIPT" ]]; then
+    info "  Running WM8960 audio driver installer..."
+    bash "$WHISPLAY_DRIVER_SCRIPT"
+    success "  WM8960 audio driver installed."
+else
+    warn "  install_wm8960_drive.sh not found at expected path — check $WHISPLAY_DIR/Driver/"
+    warn "  Audio (mic + speaker) may not work until the WM8960 driver is installed manually."
+    warn "  Run manually: cd $WHISPLAY_DIR/Driver && sudo bash install_wm8960_drive.sh"
+fi
+
+# Copy the Whisplay.py driver module into the NxtGenAI directory
+# so ui.py can import it for LCD/button/LED control
+WHISPLAY_PY="$WHISPLAY_DIR/Driver/Whisplay.py"
+if [[ -f "$WHISPLAY_PY" ]]; then
+    cp "$WHISPLAY_PY" /home/pi/NxtGenAI/Whisplay.py 2>/dev/null || \
+        cp "$WHISPLAY_PY" "$(dirname "${BASH_SOURCE[0]}")/Whisplay.py" 2>/dev/null || true
+    success "  Whisplay.py driver module copied to project directory."
+else
+    warn "  Whisplay.py not found in $WHISPLAY_DIR/Driver/ — LCD/button/LED control may be limited."
+fi
+
+success "Whisplay Pi AI Hat driver setup complete."
+warn "  *** A REBOOT is required after install for WM8960 audio and I2S overlay to activate. ***"
+warn "  *** setup.sh will continue — reboot at the end. ***"
+
+# =============================================================================
+# STEP 4 — Enable I2C and SPI
+# =============================================================================
+info "Step 4/9 — Enabling I2C and SPI interfaces..."
 
 # Enable I2C in /boot/config.txt (or /boot/firmware/config.txt on bookworm)
 CONFIG_FILE="/boot/firmware/config.txt"
@@ -122,9 +172,9 @@ modprobe i2c-dev 2>/dev/null || true
 success "I2C and SPI configured."
 
 # =============================================================================
-# STEP 4 — Create directory structure
+# STEP 5 — Create directory structure
 # =============================================================================
-info "Step 4/8 — Creating directory structure..."
+info "Step 5/9 — Creating directory structure..."
 
 mkdir -p /home/pi/models
 mkdir -p /home/pi/wordlists
@@ -136,9 +186,9 @@ chown -R pi:pi /home/pi/models /home/pi/wordlists /home/pi/reports
 success "Directories created."
 
 # =============================================================================
-# STEP 5 — Python virtual environment + pip packages
+# STEP 6 — Python virtual environment + pip packages
 # =============================================================================
-info "Step 5/8 — Setting up Python virtual environment..."
+info "Step 6/9 — Setting up Python virtual environment..."
 
 VENV="/home/pi/nxtgenai-venv"
 
@@ -171,9 +221,9 @@ if [[ "$SCRIPT_DIR" != "/home/pi/NxtGenAI" ]]; then
 fi
 
 # =============================================================================
-# STEP 6 — Download TinyLlama model (if missing)
+# STEP 7 — Download TinyLlama model (if missing)
 # =============================================================================
-info "Step 6/8 — Checking for LLM model..."
+info "Step 7/9 — Checking for LLM model..."
 
 MODEL_PATH="/home/pi/models/tinyllama-1.1b-q4_0.gguf"
 MODEL_URL="https://huggingface.co/TheBloke/TinyLlama-1.1B-Chat-v1.0-GGUF/resolve/main/tinyllama-1.1b-chat-v1.0.Q4_0.gguf"
@@ -207,9 +257,9 @@ fi
 success "Model check complete."
 
 # =============================================================================
-# STEP 7 — Download 10k common passwords wordlist (if missing)
+# STEP 8 — Download 10k common passwords wordlist (if missing)
 # =============================================================================
-info "Step 7/8 — Setting up wordlists..."
+info "Step 8/9 — Setting up wordlists..."
 
 WORDLIST_10K="/home/pi/wordlists/10k-common.txt"
 WORDLIST_URL="https://raw.githubusercontent.com/danielmiessler/SecLists/master/Passwords/Common-Credentials/10k-most-common.txt"
@@ -249,9 +299,9 @@ fi
 success "Wordlists ready."
 
 # =============================================================================
-# STEP 7b — Download Vosk small English model (for Push-to-Talk voice input)
+# STEP 8b — Download Vosk small English model (for Push-to-Talk voice input)
 # =============================================================================
-info "Step 7b/8 — Checking for Vosk offline speech recognition model..."
+info "Step 8b/9 — Checking for Vosk offline speech recognition model..."
 
 VOSK_MODEL_DIR="/home/pi/models/vosk-model-small-en-us"
 VOSK_ZIP="/home/pi/models/vosk-model-small-en-us-0.15.zip"
@@ -286,21 +336,21 @@ fi
 success "Vosk model check complete."
 
 # =============================================================================
-# STEP 8 — Configure swap + systemd service
+# STEP 9 — Configure swap + systemd service
 # =============================================================================
-info "Step 8/8 — Configuring swap and systemd service..."
+info "Step 9/9 — Configuring swap and systemd service..."
 
-# Set up 64 MB swap (LLM loading can spike RAM briefly)
+# Set up 256 MB swap (LLM loading can spike RAM briefly)
 if ! swapon --show | grep -q /swapfile; then
     if [[ ! -f /swapfile ]]; then
-        dd if=/dev/zero of=/swapfile bs=1M count=64 status=none
+        dd if=/dev/zero of=/swapfile bs=1M count=256 status=none
         chmod 600 /swapfile
         mkswap /swapfile -q
     fi
     swapon /swapfile
     # Persist across reboots
     grep -q "/swapfile" /etc/fstab || echo "/swapfile none swap sw 0 0" >> /etc/fstab
-    success "  64 MB swap enabled."
+    success "  256 MB swap enabled."
 else
     info "  Swap already active."
 fi
@@ -380,4 +430,15 @@ echo -e "${CYAN}└────────────────────�
 echo ""
 warn "LEGAL NOTICE: Use only on networks/systems you own or have"
 warn "explicit written authorisation to test. Misuse is illegal."
+echo ""
+echo -e "${YELLOW}┌─────────────────────────────────────────────────────────────────┐${NC}"
+echo -e "${YELLOW}│  ⚠️   REBOOT REQUIRED                                           │${NC}"
+echo -e "${YELLOW}│  The Whisplay WM8960 audio driver and I2S overlay will not      │${NC}"
+echo -e "${YELLOW}│  activate until you reboot. Please run:                         │${NC}"
+echo -e "${YELLOW}│                                                                  │${NC}"
+echo -e "${YELLOW}│       sudo reboot                                                │${NC}"
+echo -e "${YELLOW}│                                                                  │${NC}"
+echo -e "${YELLOW}│  After reboot, verify audio with:  aplay -l                     │${NC}"
+echo -e "${YELLOW}│  You should see:  wm8960-soundcard                              │${NC}"
+echo -e "${YELLOW}└─────────────────────────────────────────────────────────────────┘${NC}"
 echo ""
