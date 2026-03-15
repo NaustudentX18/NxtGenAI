@@ -32,11 +32,17 @@ try:
     import board
     import busio
     import adafruit_ssd1306
-    from PIL import Image, ImageDraw
     _HW_AVAILABLE = True
 except ImportError:
     log.warning("Adafruit SSD1306 libs not found — running in headless mode.")
     _HW_AVAILABLE = False
+
+try:
+    from PIL import Image, ImageDraw
+    _PIL_AVAILABLE = True
+except ImportError:
+    log.warning("Pillow not found — OLED draw disabled.")
+    _PIL_AVAILABLE = False
 
 try:
     import RPi.GPIO as GPIO
@@ -97,8 +103,12 @@ class OLEDDisplay:
         self._event_q: queue.Queue[str] = queue.Queue(maxsize=8)
 
         # PIL image buffer (drawn off-screen, pushed to OLED in refresh())
-        self._image  = Image.new("1", (OLED_WIDTH, OLED_HEIGHT), 0)
-        self._draw   = ImageDraw.Draw(self._image)
+        if _PIL_AVAILABLE:
+            self._image = Image.new("1", (OLED_WIDTH, OLED_HEIGHT), 0)
+            self._draw  = ImageDraw.Draw(self._image)
+        else:
+            self._image = None
+            self._draw  = None
 
         # OLED device handle
         self._oled: Optional[object] = None
@@ -199,14 +209,20 @@ class OLEDDisplay:
     # ── Internal draw helpers ─────────────────────────────────────────────────
     def _clear_buf(self) -> None:
         """Clear PIL image buffer to black."""
+        if self._draw is None:
+            return
         self._draw.rectangle((0, 0, OLED_WIDTH, OLED_HEIGHT), fill=0)
 
     def _text(self, x: int, y: int, text: str, fill: int = 1) -> None:
         """Draw text to buffer. fill=1 = white, fill=0 = black."""
+        if self._draw is None:
+            return
         self._draw.text((x, y), text, font=FONT_SMALL, fill=fill)
 
     def _hline(self, y: int) -> None:
         """Draw a full-width horizontal line."""
+        if self._draw is None:
+            return
         self._draw.line((0, y, OLED_WIDTH - 1, y), fill=1)
 
     def _bar(self, x: int, y: int, w: int, h: int,
@@ -215,6 +231,8 @@ class OLEDDisplay:
         Draw a progress/battery bar.
         filled_pct: 0.0–1.0
         """
+        if self._draw is None:
+            return
         # Outline
         self._draw.rectangle((x, y, x + w, y + h), outline=1, fill=0)
         # Filled portion
@@ -224,7 +242,7 @@ class OLEDDisplay:
 
     def refresh(self) -> None:
         """Push PIL image buffer to physical OLED (thread-safe)."""
-        if self._oled is None:
+        if self._oled is None or self._image is None:
             return
         with self._lock:
             self._oled.image(self._image)
@@ -232,6 +250,8 @@ class OLEDDisplay:
 
     def clear(self) -> None:
         """Clear display to black."""
+        if self._draw is None:
+            return
         with self._lock:
             self._clear_buf()
         self.refresh()
@@ -255,6 +275,8 @@ class OLEDDisplay:
         Frame 1: blank → Frame 2: border → Frame 3: title → Frame 4: tagline
         Each frame shown for ~200 ms to achieve smooth 5 fps animation.
         """
+        if self._draw is None:
+            return
         frames = [
             self._splash_frame_1,
             self._splash_frame_2,
@@ -270,6 +292,8 @@ class OLEDDisplay:
 
     def _splash_frame_1(self) -> None:
         """Frame 1: corners only."""
+        if self._draw is None:
+            return
         self._draw.rectangle((0, 0, 3, 3), fill=1)
         self._draw.rectangle((OLED_WIDTH - 4, 0, OLED_WIDTH - 1, 3), fill=1)
         self._draw.rectangle((0, OLED_HEIGHT - 4, 3, OLED_HEIGHT - 1), fill=1)
@@ -278,17 +302,23 @@ class OLEDDisplay:
 
     def _splash_frame_2(self) -> None:
         """Frame 2: full border."""
+        if self._draw is None:
+            return
         self._draw.rectangle((0, 0, OLED_WIDTH - 1, OLED_HEIGHT - 1),
                               outline=1, fill=0)
 
     def _splash_frame_3(self) -> None:
         """Frame 3: border + title."""
+        if self._draw is None:
+            return
         self._draw.rectangle((0, 0, OLED_WIDTH - 1, OLED_HEIGHT - 1),
                               outline=1, fill=0)
         self._text(14, 18, "NxtGenAI")
 
     def _splash_frame_4(self) -> None:
         """Frame 4: border + title + tagline + shield icon."""
+        if self._draw is None:
+            return
         self._draw.rectangle((0, 0, OLED_WIDTH - 1, OLED_HEIGHT - 1),
                               outline=1, fill=0)
         self._text(14, 16, "NxtGenAI")
@@ -304,6 +334,8 @@ class OLEDDisplay:
         Show a loading screen with animated progress dots.
         Called every 200 ms during LLM init — non-blocking.
         """
+        if self._draw is None:
+            return
         # Animate a spinner: cycle through |/-\ characters
         t    = int(time.monotonic() * 4) % 4
         spin = r"|/-\\"[t]
@@ -331,6 +363,8 @@ class OLEDDisplay:
         Selected item is inverted (black text on white background).
         Battery % shown in bottom-right corner.
         """
+        if self._draw is None:
+            return
         with self._lock:
             self._clear_buf()
             # Title bar
@@ -364,6 +398,8 @@ class OLEDDisplay:
     # ── Status / message screen ───────────────────────────────────────────────
     def show_message(self, title: str, body: str) -> None:
         """Display a two-line status screen (title + body)."""
+        if self._draw is None:
+            return
         with self._lock:
             self._clear_buf()
             self._draw.rectangle((0, 0, OLED_WIDTH - 1, 10), fill=1)
@@ -380,6 +416,8 @@ class OLEDDisplay:
           4–6 → bordered box (caution)
           7–10 → inverted (danger)
         """
+        if self._draw is None:
+            return
         with self._lock:
             self._clear_buf()
             # Header
@@ -411,6 +449,8 @@ class OLEDDisplay:
         Display a scrollable text view.
         Shows up to 4 lines with a scroll indicator on the right edge.
         """
+        if self._draw is None:
+            return
         with self._lock:
             self._clear_buf()
             # Header
@@ -437,6 +477,8 @@ class OLEDDisplay:
         Display the PTT 'Listening...' indicator while Button C is held.
         Shown immediately on C_PRESS so the user knows the mic is live.
         """
+        if self._draw is None:
+            return
         with self._lock:
             self._clear_buf()
             self._draw.rectangle((0, 0, OLED_WIDTH - 1, OLED_HEIGHT - 1),
