@@ -117,8 +117,9 @@ fi
 WHISPLAY_DRIVER_SCRIPT="$WHISPLAY_DIR/Driver/install_wm8960_drive.sh"
 if [[ -f "$WHISPLAY_DRIVER_SCRIPT" ]]; then
     info "  Running WM8960 audio driver installer..."
-    bash "$WHISPLAY_DRIVER_SCRIPT"
-    success "  WM8960 audio driver installed."
+    bash "$WHISPLAY_DRIVER_SCRIPT" \
+        && success "  WM8960 audio driver installed." \
+        || warn "  WM8960 driver install failed — audio may not work correctly."
 else
     warn "  install_wm8960_drive.sh not found at expected path — check $WHISPLAY_DIR/Driver/"
     warn "  Audio (mic + speaker) may not work until the WM8960 driver is installed manually."
@@ -129,9 +130,12 @@ fi
 # so ui.py can import it for LCD/button/LED control
 WHISPLAY_PY="$WHISPLAY_DIR/Driver/Whisplay.py"
 if [[ -f "$WHISPLAY_PY" ]]; then
-    cp "$WHISPLAY_PY" /home/pi/NxtGenAI/Whisplay.py 2>/dev/null || \
-        cp "$WHISPLAY_PY" "$(dirname "${BASH_SOURCE[0]}")/Whisplay.py" 2>/dev/null || true
-    success "  Whisplay.py driver module copied to project directory."
+    if cp "$WHISPLAY_PY" /home/pi/NxtGenAI/Whisplay.py 2>/dev/null || \
+       cp "$WHISPLAY_PY" "$(dirname "${BASH_SOURCE[0]}")/Whisplay.py" 2>/dev/null; then
+        success "  Whisplay.py driver module copied to project directory."
+    else
+        warn "  Failed to copy Whisplay.py — LCD/button/LED control may be limited."
+    fi
 else
     warn "  Whisplay.py not found in $WHISPLAY_DIR/Driver/ — LCD/button/LED control may be limited."
 fi
