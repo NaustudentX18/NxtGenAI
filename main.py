@@ -122,7 +122,7 @@ class NxtGenAIApp:
     @staticmethod
     def _load_config() -> configparser.ConfigParser:
         """Load config.ini; fall back to bundled defaults if file missing."""
-        cfg = configparser.ConfigParser()
+        cfg = configparser.ConfigParser(inline_comment_prefixes=("#", ";"))
         cfg_path = os.path.join(os.path.dirname(__file__), "config.ini")
         if not os.path.exists(cfg_path):
             log.warning("config.ini not found — using built-in defaults.")
