@@ -220,7 +220,18 @@ fi
 
 # Copy project files to /home/pi/NxtGenAI if not already there
 if [[ "$SCRIPT_DIR" != "/home/pi/NxtGenAI" ]]; then
-    cp -u "$SCRIPT_DIR"/*.py "$SCRIPT_DIR"/*.ini /home/pi/NxtGenAI/ 2>/dev/null || true
+    cp -u \
+        "$SCRIPT_DIR/main.py" \
+        "$SCRIPT_DIR/gui.py" \
+        "$SCRIPT_DIR/simulate.py" \
+        "$SCRIPT_DIR/config.ini" \
+        "$SCRIPT_DIR/requirements.txt" \
+        "$SCRIPT_DIR/setup.sh" \
+        /home/pi/NxtGenAI/ 2>/dev/null || true
+    if [[ -d "$SCRIPT_DIR/src" ]]; then
+        mkdir -p /home/pi/NxtGenAI/src
+        cp -a "$SCRIPT_DIR/src/." /home/pi/NxtGenAI/src/
+    fi
     chown -R pi:pi /home/pi/NxtGenAI
 fi
 

@@ -115,16 +115,23 @@ User Input → Thought (LLM) → Action (tool call) → Observation (output) →
 
 ```
 NxtGenAI/
-├── setup.sh          # One-command installer
-├── main.py           # Boot splash → LLM load → main loop
-├── ai_core.py        # ReAct reasoning + risk scoring
-├── ui.py             # OLED driver + buttons (A/B/C)
-├── tools.py          # nmap, hydra, aireplay-ng, sqlmap, ARP
-├── power.py          # PiSugar I2C + low-power management
-├── config.ini        # Paths, thresholds, model config
-├── requirements.txt  # Minimal Python dependencies
-├── README.md         # This file
-└── LICENSE           # MIT
+├── main.py                # Entry wrapper (imports src package)
+├── gui.py                 # Desktop GUI entry wrapper
+├── simulate.py            # Hardware-free simulation test
+├── config.ini             # Paths, thresholds, model config
+├── setup.sh               # One-command installer
+├── requirements.txt       # Python dependencies
+├── src/
+│   └── nxtgenai/
+│       ├── main.py        # Boot splash → LLM load → main loop
+│       ├── gui.py         # Tkinter desktop "Pentest Buddy" UI
+│       ├── ai_core.py     # ReAct reasoning + risk scoring
+│       ├── ui.py          # OLED driver + buttons (A/B/C)
+│       ├── tools.py       # nmap, hydra, aircrack, sqlmap wrappers
+│       ├── power.py       # PiSugar I2C + low-power management
+│       └── voice_input.py # Offline Push-to-Talk (Vosk/PyAudio)
+├── .github/workflows/     # CI + PR checks
+└── LICENSE                # MIT
 ```
 
 ---

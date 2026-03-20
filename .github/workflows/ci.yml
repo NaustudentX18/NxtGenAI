@@ -28,13 +28,13 @@ jobs:
         run: pip install flake8
 
       - name: Check Python syntax (py_compile)
-        run: python -m compileall -q *.py
+        run: python -m compileall -q main.py gui.py simulate.py ai_core.py power.py tools.py ui.py voice_input.py src
 
       - name: Run flake8
         # --select=E9,F limits to: E9xx = runtime/syntax errors,
         # F = pyflakes (undefined names, unused imports, etc.)
         # This keeps CI fast and focused on real defects rather than style.
-        run: flake8 *.py --select=E9,F --count --statistics
+        run: flake8 main.py gui.py simulate.py ai_core.py power.py tools.py ui.py voice_input.py src --select=E9,F --count --statistics
 
   shellcheck:
     name: ShellCheck
